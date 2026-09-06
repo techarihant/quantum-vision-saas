@@ -19,6 +19,9 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
 
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionResult, setConnectionResult] = useState<{ success: boolean; message: string } | null>(null);
+
   useEffect(() => {
     if (whatsappAccount) {
       setProviderMode(whatsappAccount.providerMode || 'official');
@@ -52,6 +55,41 @@ export default function SettingsPage() {
       }, 4000);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleTestMetaConnection = async () => {
+    setTestingConnection(true);
+    setConnectionResult(null);
+    try {
+      const res = await fetch('/api/settings/whatsapp/test-connection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId: currentOrg.id,
+          phoneNumberId,
+          accessToken
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setConnectionResult({
+          success: true,
+          message: `🟢 Live Meta Connection Verified! Phone: ${data.displayPhoneNumber || phoneNumberId} (${data.verifiedName || currentOrg.name}), Quality: ${data.qualityRating}`
+        });
+      } else {
+        setConnectionResult({
+          success: false,
+          message: `🔴 ${data.error || 'Meta API Connection Failed. Please verify your Access Token & Phone Number ID.'}`
+        });
+      }
+    } catch (err: any) {
+      setConnectionResult({
+        success: false,
+        message: `🔴 Connection check error: ${err.message}`
+      });
+    } finally {
+      setTestingConnection(false);
     }
   };
 
@@ -138,8 +176,8 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Connection Status Card */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-3">
+      {/* Connection Status & Diagnostic Card */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 font-bold">
@@ -154,10 +192,35 @@ export default function SettingsPage() {
               </p>
             </div>
           </div>
-          <span className="rounded-full bg-emerald-100 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-800">
-            Quality: GREEN
-          </span>
+
+          <button
+            type="button"
+            onClick={handleTestMetaConnection}
+            disabled={testingConnection}
+            className="rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2 shadow-xs"
+          >
+            {testingConnection ? (
+              <>
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                Testing Meta Graph API...
+              </>
+            ) : (
+              '⚡ Test Meta API Connection'
+            )}
+          </button>
         </div>
+
+        {connectionResult && (
+          <div
+            className={`rounded-xl border p-4 text-xs font-bold ${
+              connectionResult.success
+                ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+                : 'border-rose-300 bg-rose-50 text-rose-900'
+            }`}
+          >
+            {connectionResult.message}
+          </div>
+        )}
       </div>
 
       {/* Settings Form */}
