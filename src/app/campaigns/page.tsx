@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { Campaign } from '@/lib/types';
+import { getLocalCampaigns, saveLocalCampaigns, mergeCampaigns } from '@/lib/storage';
 
 export default function CampaignsPage() {
   const { currentOrg } = useApp();
@@ -14,11 +15,28 @@ export default function CampaignsPage() {
 
   useEffect(() => {
     async function loadCampaigns() {
+      setLoading(true);
+      const local = getLocalCampaigns(currentOrg.id);
+      if (local.length > 0) {
+        setCampaigns(local);
+      }
+
       try {
         const res = await fetch(`/api/campaigns?orgId=${currentOrg.id}`);
         if (res.ok) {
-          const json = await res.json();
-          setCampaigns(json);
+          const json: Campaign[] = await res.json();
+          const merged = mergeCampaigns(json, local);
+          setCampaigns(merged);
+          saveLocalCampaigns(currentOrg.id, merged);
+
+          // If local campaigns missing on server (e.g. server reset), sync back to server
+          if (local.length > 0 && json.length < merged.length) {
+            fetch('/api/campaigns/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ organizationId: currentOrg.id, campaigns: merged })
+            }).catch(console.error);
+          }
         }
       } catch (e) {
         console.error(e);
@@ -28,6 +46,7 @@ export default function CampaignsPage() {
     }
     loadCampaigns();
   }, [currentOrg]);
+
 
   return (
     <div className="space-y-6">

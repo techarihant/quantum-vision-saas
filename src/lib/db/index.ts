@@ -224,6 +224,39 @@ export function deleteContact(orgId: string, id: string): boolean {
   return false;
 }
 
+export function upsertContactsBatch(orgId: string, contacts: Contact[]): Contact[] {
+  const db = getDB();
+  for (const c of contacts) {
+    const existingIdx = db.contacts.findIndex(
+      (item) => item.organizationId === orgId && (item.id === c.id || item.whatsappNumber === c.whatsappNumber)
+    );
+    if (existingIdx !== -1) {
+      db.contacts[existingIdx] = { ...db.contacts[existingIdx], ...c, organizationId: orgId };
+    } else {
+      db.contacts.unshift({ ...c, organizationId: orgId });
+    }
+  }
+  saveDB(db);
+  return db.contacts.filter((c) => c.organizationId === orgId);
+}
+
+export function upsertCampaignsBatch(orgId: string, campaigns: Campaign[]): Campaign[] {
+  const db = getDB();
+  for (const c of campaigns) {
+    const existingIdx = db.campaigns.findIndex(
+      (item) => item.organizationId === orgId && item.id === c.id
+    );
+    if (existingIdx !== -1) {
+      db.campaigns[existingIdx] = { ...db.campaigns[existingIdx], ...c, organizationId: orgId };
+    } else {
+      db.campaigns.unshift({ ...c, organizationId: orgId });
+    }
+  }
+  saveDB(db);
+  return db.campaigns.filter((c) => c.organizationId === orgId);
+}
+
+
 // Conversation & Messaging Operations
 export function getConversations(
   orgId: string,

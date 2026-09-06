@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { CheckCircle2, Key, Layers, Check, Sparkles } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+
 
 export default function SettingsPage() {
   const { currentOrg, whatsappAccount, saveAccountSettings } = useApp();
@@ -141,12 +143,30 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">WhatsApp API & Tenant Settings</h1>
-        <p className="text-xs text-slate-500">
-          Configure Meta Cloud API credentials, access tokens, and webhook secrets for <strong className="text-slate-800">{currentOrg.name}</strong>.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">WhatsApp API & Tenant Settings</h1>
+          <p className="text-xs text-slate-500">
+            Configure Meta Cloud API credentials, access tokens, and webhook secrets for <strong className="text-slate-800">{currentOrg.name}</strong>.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link
+            href="/settings/database"
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-xs"
+          >
+            🐬 Database Connection
+          </Link>
+          <Link
+            href="/settings/social"
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-xs"
+          >
+            ✨ Social Auto-Connect
+          </Link>
+        </div>
       </div>
+
 
       {toastMsg && (
         <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-xs font-bold text-emerald-900 flex items-center gap-2 shadow-xs">
