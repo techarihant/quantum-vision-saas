@@ -34,7 +34,7 @@ export default function SocialSettingsPage() {
               </div>
               <div>
                 <h3 className="font-bold text-slate-900 text-sm">Instagram Business Account</h3>
-                <p className="text-xs text-slate-500">@acme_official</p>
+                <p className="text-xs text-slate-500">@dobcy_official</p>
               </div>
             </div>
 
@@ -72,7 +72,7 @@ export default function SocialSettingsPage() {
               </div>
               <div>
                 <h3 className="font-bold text-slate-900 text-sm">Facebook Official Page</h3>
-                <p className="text-xs text-slate-500">Acme Technologies India</p>
+                <p className="text-xs text-slate-500">Dobcy Technologies India</p>
               </div>
             </div>
 

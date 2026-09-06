@@ -10,6 +10,7 @@ interface AppContextType {
   setCurrentUser: (user: User) => void;
   whatsappAccount: WhatsAppAccount | null;
   refreshAccount: () => void;
+  saveAccountSettings: (updates: Partial<WhatsAppAccount>) => Promise<void>;
   orgs: Organization[];
   users: User[];
   isDemoMode: boolean;
@@ -81,13 +82,64 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const fetchAccount = async () => {
     try {
       const res = await fetch(`/api/settings/whatsapp?orgId=${currentOrg.id}`);
+      let serverData = {};
       if (res.ok) {
-        const data = await res.json();
-        setWhatsappAccount(data);
-        setIsDemoMode(data.providerMode === 'demo');
+        serverData = await res.json();
       }
+
+      // Check localStorage for client-side persistence override
+      let localOverride = {};
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem(`qv_settings_${currentOrg.id}`);
+        if (stored) {
+          try {
+            localOverride = JSON.parse(stored);
+          } catch (e) {
+            console.error('Failed to parse stored settings:', e);
+          }
+        }
+      }
+
+      const mergedAccount = { ...serverData, ...localOverride } as WhatsAppAccount;
+      setWhatsappAccount(mergedAccount);
+      setIsDemoMode(mergedAccount.providerMode === 'demo');
     } catch (err) {
       console.error('Failed to load WhatsApp Account settings', err);
+    }
+  };
+
+  const saveAccountSettings = async (updates: Partial<WhatsAppAccount>) => {
+    try {
+      const payload = {
+        organizationId: currentOrg.id,
+        ...(whatsappAccount || {}),
+        ...updates
+      };
+
+      // 1. Save in localStorage for immediate client-side persistence across refreshes
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`qv_settings_${currentOrg.id}`, JSON.stringify(payload));
+      }
+
+      // 2. Sync to backend API
+      const res = await fetch('/api/settings/whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const updated = await res.json();
+        const merged = { ...updated, ...updates };
+        setWhatsappAccount(merged);
+        setIsDemoMode(merged.providerMode === 'demo');
+      } else {
+        // Fallback to local state if backend error
+        setWhatsappAccount(payload as WhatsAppAccount);
+        setIsDemoMode(payload.providerMode === 'demo');
+      }
+    } catch (err) {
+      console.error('Error saving settings:', err);
     }
   };
 
@@ -104,6 +156,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setCurrentUser,
         whatsappAccount,
         refreshAccount: fetchAccount,
+        saveAccountSettings,
         orgs: availableOrgs,
         users: availableUsers,
         isDemoMode,

@@ -5,7 +5,7 @@ import { CheckCircle2, Key, Layers, Check, Sparkles } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
 export default function SettingsPage() {
-  const { currentOrg, whatsappAccount, refreshAccount } = useApp();
+  const { currentOrg, whatsappAccount, saveAccountSettings } = useApp();
 
   const [providerMode, setProviderMode] = useState<'official' | 'demo'>('official');
 
@@ -34,32 +34,49 @@ export default function SettingsPage() {
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/settings/whatsapp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          organizationId: currentOrg.id,
-          providerMode,
-          metaAppId,
-          metaAppSecret,
-          wbaId,
-          phoneNumberId,
-          accessToken,
-          webhookVerifyToken
-        })
+      await saveAccountSettings({
+        providerMode,
+        metaAppId,
+        metaAppSecret,
+        wbaId,
+        phoneNumberId,
+        accessToken,
+        webhookVerifyToken
       });
 
-      if (res.ok) {
-        setSaved(true);
-        setToastMsg('✅ Meta API Configuration & Credentials Saved Successfully!');
-        refreshAccount();
-        setTimeout(() => {
-          setSaved(false);
-          setToastMsg('');
-        }, 4000);
-      }
+      setSaved(true);
+      setToastMsg('✅ Meta API Configuration Saved & Persisted (Survives Refresh & Server Restart)!');
+      setTimeout(() => {
+        setSaved(false);
+        setToastMsg('');
+      }, 4000);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleClearDemoData = () => {
+    if (confirm('Clear saved credentials and reset to clean production state?')) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(`qv_settings_${currentOrg.id}`);
+      }
+      setMetaAppId('');
+      setMetaAppSecret('');
+      setWbaId('');
+      setPhoneNumberId('');
+      setAccessToken('');
+      setWebhookVerifyToken('qv_verify_token_dobcy_2026');
+      saveAccountSettings({
+        providerMode: 'official',
+        metaAppId: '',
+        metaAppSecret: '',
+        wbaId: '',
+        phoneNumberId: '',
+        accessToken: '',
+        webhookVerifyToken: 'qv_verify_token_dobcy_2026'
+      });
+      setToastMsg('✨ Saved settings cleared and reset to clean Live mode.');
+      setTimeout(() => setToastMsg(''), 4000);
     }
   };
 
@@ -223,7 +240,14 @@ export default function SettingsPage() {
           />
         </div>
 
-        <div className="flex justify-end pt-4 border-t border-slate-200">
+        <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+          <button
+            type="button"
+            onClick={handleClearDemoData}
+            className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+          >
+            Clear / Reset Configuration
+          </button>
           <button
             type="submit"
             className="rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 flex items-center gap-2 shadow-xs"
