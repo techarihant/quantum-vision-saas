@@ -1,31 +1,190 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Camera, Globe, ShieldCheck, CheckCircle2, Zap, RefreshCw, Key, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Camera, Globe, CheckCircle2, Zap, RefreshCw, Key, Check, Sparkles, AlertCircle, HelpCircle } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
 export default function SocialSettingsPage() {
   const { currentOrg } = useApp();
+
+  const [instagramUsername, setInstagramUsername] = useState('');
+  const [instagramAccountId, setInstagramAccountId] = useState('');
+  const [facebookPageName, setFacebookPageName] = useState('');
+  const [facebookPageId, setFacebookPageId] = useState('');
+  const [pageAccessToken, setPageAccessToken] = useState('');
+  const [webhookVerifyToken, setWebhookVerifyToken] = useState('qv_social_verify_token_2026');
+
   const [autoDmEnabled, setAutoDmEnabled] = useState(true);
   const [autoHandoffEnabled, setAutoHandoffEnabled] = useState(true);
   const [leadScoreBonus, setLeadScoreBonus] = useState(25);
-  const [webhookStatus, setWebhookStatus] = useState('VERIFIED & CONNECTED');
+
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Load existing credentials on mount
+  useEffect(() => {
+    const savedLocal = typeof window !== 'undefined' ? localStorage.getItem(`qv_social_settings_${currentOrg.id}`) : null;
+    if (savedLocal) {
+      try {
+        const parsed = JSON.parse(savedLocal);
+        setInstagramUsername(parsed.instagramUsername || '');
+        setInstagramAccountId(parsed.instagramAccountId || '');
+        setFacebookPageName(parsed.facebookPageName || '');
+        setFacebookPageId(parsed.facebookPageId || '');
+        setPageAccessToken(parsed.pageAccessToken || '');
+        setWebhookVerifyToken(parsed.webhookVerifyToken || 'qv_social_verify_token_2026');
+      } catch (e) {}
+    } else {
+      // Default to empty strings so demo handles are cleared
+      setInstagramUsername('');
+      setInstagramAccountId('');
+      setFacebookPageName('');
+      setFacebookPageId('');
+    }
+  }, [currentOrg.id]);
+
+  const handleSaveSocialSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setToastMsg('');
+
+    const payload = {
+      organizationId: currentOrg.id,
+      instagramUsername,
+      instagramAccountId,
+      facebookPageName,
+      facebookPageId,
+      pageAccessToken,
+      webhookVerifyToken
+    };
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`qv_social_settings_${currentOrg.id}`, JSON.stringify(payload));
+    }
+
+    try {
+      const res = await fetch('/api/settings/social', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSaved(true);
+        setToastMsg('✨ Social credentials updated & saved for your live account!');
+        setTimeout(() => setSaved(false), 3000);
+      }
+    } catch (err: any) {
+      setToastMsg('Saved locally! Network error syncing to server.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch('/api/settings/social', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId: currentOrg.id,
+          instagramUsername,
+          instagramAccountId,
+          facebookPageName,
+          facebookPageId,
+          pageAccessToken,
+          webhookVerifyToken
+        })
+      });
+      const data = await res.json();
+      if (data.liveVerified) {
+        setTestResult({
+          success: true,
+          message: `🟢 Live Meta Instagram Graph API Connection Verified! Username: @${data.liveDetails.username || instagramUsername}`
+        });
+      } else if (data.apiError) {
+        setTestResult({
+          success: false,
+          message: `⚠️ Meta Verification Error: ${data.apiError}`
+        });
+      } else {
+        setTestResult({
+          success: true,
+          message: `✅ Social Channels Configured! Active handle: @${instagramUsername || 'Your_Handle'}`
+        });
+      }
+    } catch (err: any) {
+      setTestResult({
+        success: false,
+        message: `Error testing connection: ${err.message}`
+      });
+    } finally {
+      setTesting(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-          <Camera size={24} className="text-purple-600" />
-          Instagram & Facebook Connected Channels
-        </h1>
-        <p className="text-xs text-slate-500">
-          Official Meta Graph API webhooks and channel configuration for social lead automation.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+            <Camera size={24} className="text-purple-600" />
+            Instagram & Facebook Connected Channels
+          </h1>
+          <p className="text-xs text-slate-500">
+            Connect your official Instagram Business account & Facebook Page for automated comment DMs and lead capture.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleTestConnection}
+          disabled={testing}
+          className="rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2 shadow-xs"
+        >
+          {testing ? (
+            <>
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              Testing Meta Graph API...
+            </>
+          ) : (
+            '⚡ Test Instagram Connection'
+          )}
+        </button>
       </div>
 
-      {/* Connected Accounts Cards */}
+      {toastMsg && (
+        <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-xs font-bold text-emerald-900 flex items-center gap-2 shadow-xs">
+          <CheckCircle2 size={18} className="text-emerald-600" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
+
+      {testResult && (
+        <div
+          className={`rounded-xl border p-4 text-xs font-bold flex items-center gap-2 shadow-xs ${
+            testResult.success
+              ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+              : 'border-rose-300 bg-rose-50 text-rose-900'
+          }`}
+        >
+          {testResult.success ? (
+            <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+          ) : (
+            <AlertCircle size={18} className="text-rose-600 shrink-0" />
+          )}
+          <span>{testResult.message}</span>
+        </div>
+      )}
+
+      {/* Connection Overview Banner */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {/* Instagram Account */}
+        {/* Instagram Account Card */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -34,36 +193,34 @@ export default function SocialSettingsPage() {
               </div>
               <div>
                 <h3 className="font-bold text-slate-900 text-sm">Instagram Business Account</h3>
-                <p className="text-xs text-slate-500">@dobcy_official</p>
+                <p className="text-xs font-bold text-purple-600">{instagramUsername ? `@${instagramUsername.replace(/^@/, '')}` : 'Not Connected Yet'}</p>
               </div>
             </div>
 
-            <span className="rounded-full bg-emerald-100 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-800 flex items-center gap-1">
-              <CheckCircle2 size={13} /> Connected
+            <span
+              className={`rounded-full border px-3 py-1 text-xs font-bold flex items-center gap-1 ${
+                instagramUsername
+                  ? 'bg-emerald-100 border-emerald-200 text-emerald-800'
+                  : 'bg-amber-100 border-amber-200 text-amber-800'
+              }`}
+            >
+              <CheckCircle2 size={13} /> {instagramUsername ? 'Configured' : 'Setup Required'}
             </span>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2 text-xs">
             <div className="flex justify-between">
-              <span className="text-slate-500">Meta Account ID:</span>
-              <span className="font-mono font-bold text-slate-800">17841409823412</span>
+              <span className="text-slate-500">Instagram Account ID:</span>
+              <span className="font-mono font-bold text-slate-800">{instagramAccountId || 'Not Set'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Webhook Status:</span>
-              <span className="font-bold text-emerald-600">Active (Comments + DMs)</span>
+              <span className="text-slate-500">Webhook Event:</span>
+              <span className="font-bold text-emerald-600">Comments & Direct Messages</span>
             </div>
           </div>
-
-          <button
-            onClick={() => alert('Refreshing Meta OAuth Token... Token Valid!')}
-            className="w-full flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-xs"
-          >
-            <RefreshCw size={14} />
-            <span>Re-authorize Meta OAuth</span>
-          </button>
         </div>
 
-        {/* Facebook Page */}
+        {/* Facebook Page Card */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -72,35 +229,124 @@ export default function SocialSettingsPage() {
               </div>
               <div>
                 <h3 className="font-bold text-slate-900 text-sm">Facebook Official Page</h3>
-                <p className="text-xs text-slate-500">Dobcy Technologies India</p>
+                <p className="text-xs font-bold text-blue-600">{facebookPageName || 'Not Connected Yet'}</p>
               </div>
             </div>
 
-            <span className="rounded-full bg-emerald-100 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-800 flex items-center gap-1">
-              <CheckCircle2 size={13} /> Connected
+            <span
+              className={`rounded-full border px-3 py-1 text-xs font-bold flex items-center gap-1 ${
+                facebookPageId
+                  ? 'bg-emerald-100 border-emerald-200 text-emerald-800'
+                  : 'bg-amber-100 border-amber-200 text-amber-800'
+              }`}
+            >
+              <CheckCircle2 size={13} /> {facebookPageId ? 'Configured' : 'Setup Required'}
             </span>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2 text-xs">
             <div className="flex justify-between">
               <span className="text-slate-500">Page ID:</span>
-              <span className="font-mono font-bold text-slate-800">1092837482910</span>
+              <span className="font-mono font-bold text-slate-800">{facebookPageId || 'Not Set'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Messenger Bot:</span>
               <span className="font-bold text-emerald-600">Active</span>
             </div>
           </div>
-
-          <button
-            onClick={() => alert('Refreshing Facebook Page Access Token...')}
-            className="w-full flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-xs"
-          >
-            <RefreshCw size={14} />
-            <span>Refresh Page Token</span>
-          </button>
         </div>
       </div>
+
+      {/* Account Setup Form */}
+      <form onSubmit={handleSaveSocialSettings} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+        <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+          <Key size={18} className="text-purple-600" />
+          Enter Your Real Instagram & Facebook Credentials
+        </h2>
+
+        <div className="grid grid-cols-2 gap-4 text-xs">
+          <div>
+            <label className="text-slate-700 font-semibold">Instagram Handle / Username *</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. mastjaipur or @your_handle"
+              value={instagramUsername}
+              onChange={(e) => setInstagramUsername(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 text-slate-900 font-mono focus:outline-none focus:border-purple-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-slate-700 font-semibold">Instagram Account ID (Meta Graph API) *</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. 17841409823412"
+              value={instagramAccountId}
+              onChange={(e) => setInstagramAccountId(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 text-slate-900 font-mono focus:outline-none focus:border-purple-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-slate-700 font-semibold">Facebook Page Name *</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. MastJaipur Official"
+              value={facebookPageName}
+              onChange={(e) => setFacebookPageName(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 text-slate-900 focus:outline-none focus:border-purple-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-slate-700 font-semibold">Facebook Page ID *</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. 1092837482910"
+              value={facebookPageId}
+              onChange={(e) => setFacebookPageId(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 text-slate-900 font-mono focus:outline-none focus:border-purple-500"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs text-slate-700 font-semibold">Meta Page Access Token (Instagram & Facebook Messenger API)</label>
+          <input
+            type="password"
+            placeholder="Paste your Meta Page Access Token (starts with EAA...)"
+            value={pageAccessToken}
+            onChange={(e) => setPageAccessToken(e.target.value)}
+            className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-purple-500"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs text-slate-700 font-semibold">Meta Webhook Verification Token</label>
+          <input
+            type="text"
+            required
+            value={webhookVerifyToken}
+            onChange={(e) => setWebhookVerifyToken(e.target.value)}
+            className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs text-slate-900 font-mono focus:outline-none focus:border-purple-500"
+          />
+        </div>
+
+        <div className="flex items-center justify-end pt-4 border-t border-slate-200">
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded-xl bg-purple-600 px-6 py-2.5 text-xs font-bold text-white hover:bg-purple-700 flex items-center gap-2 shadow-xs disabled:opacity-50"
+          >
+            {saved ? <Check size={16} /> : null}
+            <span>{saved ? 'Social Settings Saved!' : 'Save Social Credentials'}</span>
+          </button>
+        </div>
+      </form>
 
       {/* Global Social Automation Rules */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-6">

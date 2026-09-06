@@ -18,7 +18,8 @@ import {
   Organization,
   User,
   OrganizationMember,
-  WhatsAppAccount
+  WhatsAppAccount,
+  SocialAccount
 } from '../types';
 
 const TMP_DB_FILE = path.join('/tmp', 'saas_db.json');
@@ -398,6 +399,34 @@ export function saveTemplates(orgId: string, templates: Template[]): void {
 }
 
 
+// Social Accounts
+export function getSocialAccounts(orgId: string): SocialAccount[] {
+  const db = getDB();
+  return db.socialAccounts.filter((sa) => sa.organizationId === orgId);
+}
+
+export function saveSocialAccount(orgId: string, accountData: Partial<SocialAccount> & { platform: 'instagram' | 'facebook' }): SocialAccount {
+  const db = getDB();
+  let existing = db.socialAccounts.find((sa) => sa.organizationId === orgId && sa.platform === accountData.platform);
+  if (existing) {
+    Object.assign(existing, accountData);
+  } else {
+    existing = {
+      id: `soc_${accountData.platform}_${Date.now()}`,
+      organizationId: orgId,
+      platform: accountData.platform,
+      accountId: accountData.accountId || '',
+      accountName: accountData.accountName || '',
+      username: accountData.username || '',
+      status: 'CONNECTED',
+      connectedAt: new Date().toISOString()
+    };
+    db.socialAccounts.push(existing);
+  }
+  saveDB(db);
+  return existing;
+}
+
 // Audit Log Helper
 export function logAudit(orgId: string, userId: string, userName: string, action: string, entity: string, details: string) {
   const db = getDB();
@@ -414,3 +443,4 @@ export function logAudit(orgId: string, userId: string, userName: string, action
   db.auditLogs.unshift(entry);
   saveDB(db);
 }
+
