@@ -7,7 +7,8 @@ import {
   Search,
   CheckCircle,
   XCircle,
-  Plus
+  Plus,
+  CheckCircle2
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { Contact } from '@/lib/types';
@@ -20,6 +21,9 @@ export default function ContactsCrmPage() {
   const [search, setSearch] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
   const [optInOnly, setOptInOnly] = useState(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
+  const [saveErrorMsg, setSaveErrorMsg] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // Add Contact Modal state
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -43,8 +47,8 @@ export default function ContactsCrmPage() {
       const res = await fetch(url);
       if (res.ok) {
         const json = await res.json();
-        setContacts(json.contacts);
-        setTotal(json.total);
+        setContacts(json.contacts || []);
+        setTotal(json.total || 0);
       }
     } catch (e) {
       console.error('Failed to load contacts', e);
@@ -59,26 +63,36 @@ export default function ContactsCrmPage() {
 
   const handleCreateContact = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newContact.firstName || !newContact.whatsappNumber) return;
+    setSaveErrorMsg('');
 
+    if (!newContact.firstName.trim() || !newContact.whatsappNumber.trim()) {
+      setSaveErrorMsg('First Name and WhatsApp Phone Number are required.');
+      return;
+    }
+
+    setIsSaving(true);
     try {
       const res = await fetch('/api/contacts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           organizationId: currentOrg.id,
-          firstName: newContact.firstName,
-          lastName: newContact.lastName,
-          whatsappNumber: newContact.whatsappNumber,
-          email: newContact.email,
-          company: newContact.company,
-          country: newContact.country,
-          city: newContact.city,
-          tags: newContact.tags.split(',').map((t) => t.trim())
+          firstName: newContact.firstName.trim(),
+          lastName: newContact.lastName.trim(),
+          whatsappNumber: newContact.whatsappNumber.trim(),
+          email: newContact.email.trim(),
+          company: newContact.company.trim(),
+          country: newContact.country.trim(),
+          city: newContact.city.trim(),
+          tags: newContact.tags ? newContact.tags.split(',').map((t) => t.trim()).filter(Boolean) : ['Lead']
         })
       });
+
+      const data = await res.json();
+
       if (res.ok) {
         setIsAddOpen(false);
+        setSaveSuccessMsg(`✅ Contact "${newContact.firstName}" saved successfully!`);
         setNewContact({
           firstName: '',
           lastName: '',
@@ -90,9 +104,15 @@ export default function ContactsCrmPage() {
           tags: 'Lead'
         });
         fetchContactsList();
+        setTimeout(() => setSaveSuccessMsg(''), 4000);
+      } else {
+        setSaveErrorMsg(data.error || 'Failed to save contact. Please check details and try again.');
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error('Save contact error:', err);
+      setSaveErrorMsg(err.message || 'An unexpected error occurred while saving.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -104,7 +124,7 @@ export default function ContactsCrmPage() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
             Contact CRM
             <span className="rounded-full bg-emerald-100 border border-emerald-200 px-3 py-0.5 text-xs font-bold text-emerald-800">
-              {total.toLocaleString()} Contacts
+              {total.toLocaleString()} Contacts ({currentOrg.name})
             </span>
           </h1>
           <p className="text-xs text-slate-500">Manage audience contacts, custom fields, consent tags, and segments.</p>
@@ -128,6 +148,13 @@ export default function ContactsCrmPage() {
           </button>
         </div>
       </div>
+
+      {saveSuccessMsg && (
+        <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-xs font-bold text-emerald-900 flex items-center gap-2 shadow-xs">
+          <CheckCircle2 size={18} className="text-emerald-600" />
+          <span>{saveSuccessMsg}</span>
+        </div>
+      )}
 
       {/* Filter & Search Bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
@@ -272,6 +299,12 @@ export default function ContactsCrmPage() {
           <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
             <h3 className="text-base font-bold text-slate-900 mb-4">Add New CRM Contact</h3>
 
+            {saveErrorMsg && (
+              <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">
+                ⚠️ {saveErrorMsg}
+              </div>
+            )}
+
             <form onSubmit={handleCreateContact} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -359,9 +392,17 @@ export default function ContactsCrmPage() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                  disabled={isSaving}
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2"
                 >
-                  Save Contact
+                  {isSaving ? (
+                    <>
+                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Saving Contact...
+                    </>
+                  ) : (
+                    'Save Contact'
+                  )}
                 </button>
               </div>
             </form>

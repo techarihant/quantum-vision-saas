@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getContacts, createContact } from '@/lib/db';
+import { sanitizePhoneNumber, sanitizeInput } from '@/lib/security';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const orgId = searchParams.get('orgId') || 'org_acme';
+  const orgId = searchParams.get('orgId') || 'org_dobcy';
   const search = searchParams.get('search') || undefined;
   const tag = searchParams.get('tag') || undefined;
   const optInOnly = searchParams.get('optInOnly') === 'true';
@@ -17,20 +18,22 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const orgId = body.organizationId || 'org_acme';
+    const orgId = body.organizationId || 'org_dobcy';
 
     if (!body.firstName || !body.whatsappNumber) {
       return NextResponse.json({ error: 'First Name and WhatsApp Number are required' }, { status: 400 });
     }
 
+    const formattedPhone = sanitizePhoneNumber(body.whatsappNumber);
+
     const contact = createContact(orgId, {
-      firstName: body.firstName,
-      lastName: body.lastName || '',
-      whatsappNumber: body.whatsappNumber.startsWith('+') ? body.whatsappNumber : `+${body.whatsappNumber}`,
-      email: body.email || '',
-      company: body.company || '',
-      country: body.country || 'India',
-      city: body.city || '',
+      firstName: sanitizeInput(body.firstName),
+      lastName: sanitizeInput(body.lastName || ''),
+      whatsappNumber: formattedPhone,
+      email: body.email ? sanitizeInput(body.email) : '',
+      company: body.company ? sanitizeInput(body.company) : '',
+      country: body.country ? sanitizeInput(body.country) : 'India',
+      city: body.city ? sanitizeInput(body.city) : '',
       source: body.source || 'Manual Creation',
       optInStatus: body.optInStatus !== undefined ? body.optInStatus : true,
       optInDate: new Date().toISOString(),

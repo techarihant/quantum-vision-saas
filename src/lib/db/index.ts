@@ -21,44 +21,64 @@ import {
   WhatsAppAccount
 } from '../types';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const DB_FILE = path.join(DATA_DIR, 'saas_db.json');
+const TMP_DB_FILE = path.join('/tmp', 'saas_db.json');
+const STATIC_DB_FILE = path.join(process.cwd(), 'data', 'saas_db.json');
 
 let dbStateCache: DatabaseState | null = null;
-
-function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-}
 
 export function getDB(): DatabaseState {
   if (dbStateCache) {
     return dbStateCache;
   }
 
-  ensureDataDir();
-
-  if (fs.existsSync(DB_FILE)) {
+  // 1. Try reading from /tmp/saas_db.json if updated in serverless lifecycle
+  if (fs.existsSync(TMP_DB_FILE)) {
     try {
-      const raw = fs.readFileSync(DB_FILE, 'utf-8');
+      const raw = fs.readFileSync(TMP_DB_FILE, 'utf-8');
       dbStateCache = JSON.parse(raw);
       return dbStateCache!;
     } catch (e) {
-      console.error('Failed to read db file, re-seeding...', e);
+      console.warn('Failed reading from /tmp/saas_db.json:', e);
     }
   }
 
-  // Generate initial seed data and save to file
+  // 2. Try reading from static repo directory (data/saas_db.json)
+  if (fs.existsSync(STATIC_DB_FILE)) {
+    try {
+      const raw = fs.readFileSync(STATIC_DB_FILE, 'utf-8');
+      dbStateCache = JSON.parse(raw);
+      return dbStateCache!;
+    } catch (e) {
+      console.warn('Failed reading static saas_db.json:', e);
+    }
+  }
+
+  // 3. Fallback to initial seed data
   dbStateCache = generateSeedData();
   saveDB(dbStateCache);
   return dbStateCache;
 }
 
 export function saveDB(state: DatabaseState) {
-  ensureDataDir();
   dbStateCache = state;
-  fs.writeFileSync(DB_FILE, JSON.stringify(state, null, 2), 'utf-8');
+
+  // Try writing to /tmp (writable in Vercel Serverless Function environment)
+  try {
+    fs.writeFileSync(TMP_DB_FILE, JSON.stringify(state, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Could not write to /tmp/saas_db.json:', err);
+  }
+
+  // Also try writing to local dev data directory
+  try {
+    const dataDir = path.dirname(STATIC_DB_FILE);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    fs.writeFileSync(STATIC_DB_FILE, JSON.stringify(state, null, 2), 'utf-8');
+  } catch (err) {
+    // Expected on read-only environments like Vercel production
+  }
 }
 
 // ----------------------------------------------------

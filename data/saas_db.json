@@ -83,6 +83,27 @@
   ],
   "contacts": [
     {
+      "firstName": "TestUser",
+      "lastName": "Dobcy",
+      "whatsappNumber": "+919876543210",
+      "email": "test@dobcy.com",
+      "company": "Dobcy Tech",
+      "country": "India",
+      "city": "Mumbai",
+      "source": "Manual Creation",
+      "optInStatus": true,
+      "optInDate": "2026-09-06T14:28:50.494Z",
+      "optOutStatus": false,
+      "tags": [
+        "VIP",
+        "Lead"
+      ],
+      "customFields": {},
+      "id": "cnt_1788704930496_517",
+      "organizationId": "org_dobcy",
+      "createdAt": "2026-09-06T14:28:50.496Z"
+    },
+    {
       "id": "cnt_101",
       "organizationId": "org_dobcy",
       "firstName": "Arihant",
