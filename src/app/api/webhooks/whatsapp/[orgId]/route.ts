@@ -14,14 +14,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ orgI
   const challenge = searchParams.get('hub.challenge');
 
   const account = getWhatsAppAccount(orgId);
-  const expectedToken = account?.webhookVerifyToken || `token_${orgId}`;
+  const expectedToken = account?.webhookVerifyToken || process.env.META_WEBHOOK_VERIFY_TOKEN || 'qv_verify_token_dobcy_2026';
 
-  const result = verifyMetaWebhookToken(mode, token, expectedToken, challenge);
-
-  if (result) {
-    return new NextResponse(result, { status: 200 });
+  // Security check: Match token against stored account token, env token, or standard fallback
+  if (mode === 'subscribe' && challenge && (token === expectedToken || token === 'qv_verify_token_dobcy_2026')) {
+    console.log(`[META WEBHOOK] Verified successfully for org: ${orgId}`);
+    return new NextResponse(challenge, {
+      status: 200,
+      headers: { 'Content-Type': 'text/plain' }
+    });
   }
 
+  console.warn(`[META WEBHOOK FAILED] Token mismatch. Expected: ${expectedToken}, Got: ${token}`);
   return new NextResponse('Verification failed', { status: 403 });
 }
 
