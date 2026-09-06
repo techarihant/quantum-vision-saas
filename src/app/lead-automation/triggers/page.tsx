@@ -125,8 +125,42 @@ export default function CommentTriggersPage() {
         </div>
       </div>
 
+      {/* Meta Webhook Live Status & Setup Banner */}
+      <div className="rounded-2xl border border-purple-200 bg-purple-50/60 p-5 space-y-3 shadow-xs">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm font-bold text-purple-950">
+            <Sparkles size={18} className="text-purple-600" />
+            Meta Live Instagram Comment DM Setup & Checklist
+          </div>
+          <span className="rounded-full bg-purple-100 border border-purple-300 px-3 py-0.5 text-[11px] font-extrabold text-purple-800">
+            Live Webhook Active
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-purple-900">
+          <div className="rounded-xl border border-purple-200 bg-white p-3 space-y-1">
+            <div className="font-bold text-slate-900 flex items-center gap-1.5">
+              1. Comment from a Different IG Account
+            </div>
+            <p className="text-slate-600 text-[11px]">
+              Meta blocks automated DMs when commenting on your <strong>own</strong> account post. Comment on <strong className="text-purple-800">@mastjaipur</strong> from a <strong>personal account</strong> to test!
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-purple-200 bg-white p-3 space-y-1">
+            <div className="font-bold text-slate-900 flex items-center gap-1.5">
+              2. Meta Webhook Subscription URL
+            </div>
+            <p className="text-slate-600 text-[11px]">
+              Point Callback URL to: <code className="bg-slate-100 px-1 py-0.5 rounded font-mono font-bold text-slate-800">https://quantum-vision-saas.vercel.app/api/webhooks/social</code>
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Triggers Cards Grid */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+
         {triggers.map((trig) => (
           <div key={trig.id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
             <div className="flex items-start justify-between">
