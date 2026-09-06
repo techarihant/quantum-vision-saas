@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { Template, Contact, Campaign } from '@/lib/types';
-import { getLocalContacts, upsertLocalCampaign } from '@/lib/storage';
+import { getLocalContacts, upsertLocalCampaign, getLocalTemplates, saveLocalTemplates, mergeTemplates } from '@/lib/storage';
 
 export default function CampaignWizardPage() {
   const router = useRouter();
@@ -66,20 +66,44 @@ export default function CampaignWizardPage() {
       })
       .catch(console.error);
 
-    // Load templates
-    fetch(`/api/templates?orgId=${currentOrg.id}`)
+    // Instant local template hydration
+    const localT = getLocalTemplates(currentOrg.id);
+    if (localT.length > 0) {
+      setTemplates(localT);
+      const appr = localT.find((t) => t.status === 'APPROVED') || localT[0];
+      setSelectedTemplate(appr);
+      setLoadingTemplates(false);
+    }
+
+    // Load live templates from server / Meta Graph API
+    let tplUrl = `/api/templates?organizationId=${currentOrg.id}&orgId=${currentOrg.id}`;
+    const savedLocal = typeof window !== 'undefined' ? localStorage.getItem(`qv_settings_${currentOrg.id}`) : null;
+    if (savedLocal) {
+      try {
+        const parsed = JSON.parse(savedLocal);
+        if (parsed.wbaId && parsed.accessToken) {
+          tplUrl += `&wbaId=${encodeURIComponent(parsed.wbaId)}&accessToken=${encodeURIComponent(parsed.accessToken)}`;
+        }
+      } catch (e) {}
+    }
+
+    fetch(tplUrl)
       .then((res) => res.json())
-      .then((data: Template[]) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setTemplates(data);
-          // Default to approved template 'call_number' or first approved
-          const approved = data.find((t) => t.status === 'APPROVED') || data[0];
+      .then((data: any) => {
+        const list: Template[] = Array.isArray(data) ? data : (data.templates || []);
+        if (list.length > 0) {
+          const merged = mergeTemplates(list, localT);
+          setTemplates(merged);
+          saveLocalTemplates(currentOrg.id, merged);
+          const approved = merged.find((t) => t.status === 'APPROVED') || merged[0];
           setSelectedTemplate(approved);
         }
       })
       .catch(console.error)
       .finally(() => setLoadingTemplates(false));
   }, [currentOrg]);
+
+
 
   // Compute recipient count based on real contacts
   const targetAudienceName =

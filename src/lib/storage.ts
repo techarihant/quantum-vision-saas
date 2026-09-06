@@ -74,6 +74,41 @@ export function upsertLocalCampaign(orgId: string, campaign: Campaign): Campaign
   return updated;
 }
 
+// ------------------- TEMPLATES LOCAL PERSISTENCE -------------------
+export function getLocalTemplates(orgId: string): Template[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(TEMPLATES_KEY(orgId));
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    console.error('Failed to read local templates', e);
+    return [];
+  }
+}
+
+export function saveLocalTemplates(orgId: string, templates: Template[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(TEMPLATES_KEY(orgId), JSON.stringify(templates));
+  } catch (e) {
+    console.error('Failed to save local templates', e);
+  }
+}
+
+export function mergeTemplates(serverTemplates: Template[], localTemplates: Template[]): Template[] {
+  const map = new Map<string, Template>();
+  
+  for (const t of localTemplates) {
+    map.set(t.id || t.name, t);
+  }
+  
+  for (const t of serverTemplates) {
+    map.set(t.id || t.name, t);
+  }
+  
+  return Array.from(map.values());
+}
+
 // ------------------- SYNC MERGE UTILITIES -------------------
 export function mergeContacts(serverContacts: Contact[], localContacts: Contact[]): Contact[] {
   const map = new Map<string, Contact>();
@@ -108,3 +143,4 @@ export function mergeCampaigns(serverCampaigns: Campaign[], localCampaigns: Camp
     (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
   );
 }
+
