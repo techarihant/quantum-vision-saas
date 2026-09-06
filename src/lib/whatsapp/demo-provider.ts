@@ -1,5 +1,5 @@
-import { getDB, saveDB, addMessage, logAudit } from '../db';
-import { Message, MessageStatus } from '../types';
+import { getDB, saveDB, addMessage, logAudit, createContact } from '../db';
+import { Message, MessageStatus, Contact } from '../types';
 
 export function simulateOutboundMessageLifecycle(orgId: string, messageId: string) {
   const db = getDB();
@@ -52,28 +52,54 @@ export function simulateOutboundMessageLifecycle(orgId: string, messageId: strin
 
 export function simulateIncomingCustomerMessage(
   orgId: string,
-  contactId: string,
-  content: string
+  contactIdOrPhone: string,
+  content: string,
+  senderName?: string
 ) {
   const db = getDB();
-  const contact = db.contacts.find((c) => c.organizationId === orgId && c.id === contactId);
-  if (!contact) return null;
+  let contact: Contact | undefined = db.contacts.find(
+    (c) =>
+      c.organizationId === orgId &&
+      (c.id === contactIdOrPhone || c.whatsappNumber.replace(/[^0-9]/g, '') === contactIdOrPhone.replace(/[^0-9]/g, ''))
+  );
+
+  if (!contact) {
+    const cleanDigits = contactIdOrPhone.replace(/[^0-9]/g, '');
+    const formattedPhone = contactIdOrPhone.startsWith('+') ? contactIdOrPhone : `+${cleanDigits || '919876543210'}`;
+    contact = createContact(orgId, {
+      firstName: senderName || 'WhatsApp Customer',
+      lastName: '',
+      whatsappNumber: formattedPhone,
+      email: '',
+      company: '',
+      country: formattedPhone.startsWith('+91') ? 'India' : 'International',
+      city: '',
+      source: 'WhatsApp Inbound',
+      optInStatus: true,
+      optInDate: new Date().toISOString(),
+      optOutStatus: false,
+      tags: ['Inbound Lead'],
+      customFields: {}
+    });
+  }
+
+  const activeContact = contact;
 
   // Check for opt-out keywords
   const normalized = content.trim().toUpperCase();
   const isOptOut = ['STOP', 'UNSUBSCRIBE', 'CANCEL', 'NO'].includes(normalized);
 
   if (isOptOut) {
-    contact.optOutStatus = true;
-    contact.optOutDate = new Date().toISOString();
+    activeContact.optOutStatus = true;
+    activeContact.optOutDate = new Date().toISOString();
     
     // Add to suppression records if not exists
-    const exists = db.suppressions.some((s) => s.organizationId === orgId && s.whatsappNumber === contact.whatsappNumber);
+    const exists = db.suppressions.some((s) => s.organizationId === orgId && s.whatsappNumber === activeContact.whatsappNumber);
     if (!exists) {
       db.suppressions.push({
         id: `sup_${Date.now()}`,
         organizationId: orgId,
-        whatsappNumber: contact.whatsappNumber,
+        whatsappNumber: activeContact.whatsappNumber,
         reason: `Opted out via message: ${content}`,
         keyword: normalized,
         optedOutAt: new Date().toISOString()
@@ -85,20 +111,20 @@ export function simulateIncomingCustomerMessage(
       'sys_webhook',
       'Meta Webhook Engine',
       'Opt-Out Registered',
-      `Contact: ${contact.firstName} ${contact.lastName}`,
+      `Contact: ${activeContact.firstName} ${activeContact.lastName}`,
       `Received opt-out keyword '${normalized}'. Marketing messages suspended.`
     );
   }
 
   // Find conversation
-  let conv = db.conversations.find((c) => c.organizationId === orgId && c.contactId === contactId);
+  let conv = db.conversations.find((c) => c.organizationId === orgId && c.contactId === activeContact.id);
   const convId = conv ? conv.id : `conv_${Date.now()}`;
 
   const incomingMsg = addMessage(orgId, {
     conversationId: convId,
-    contactId: contact.id,
-    contactName: `${contact.firstName} ${contact.lastName}`,
-    whatsappNumber: contact.whatsappNumber,
+    contactId: activeContact.id,
+    contactName: `${activeContact.firstName} ${activeContact.lastName}`.trim(),
+    whatsappNumber: activeContact.whatsappNumber,
     direction: 'INBOUND',
     messageType: 'TEXT',
     content: content,
@@ -106,7 +132,7 @@ export function simulateIncomingCustomerMessage(
     sentAt: new Date().toISOString()
   });
 
-  contact.lastMessageAt = new Date().toISOString();
+  activeContact.lastMessageAt = new Date().toISOString();
 
   // If conversation was resolved, reopen it!
   conv = db.conversations.find((c) => c.id === convId);
