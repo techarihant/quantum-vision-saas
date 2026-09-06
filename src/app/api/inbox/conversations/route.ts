@@ -3,10 +3,10 @@ import { getDB, getConversations, saveDB, logAudit } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const orgId = searchParams.get('orgId') || 'org_acme';
+  const orgId = searchParams.get('orgId') || 'org_dobcy';
   const filter = (searchParams.get('filter') as any) || 'ALL';
   const search = searchParams.get('search') || undefined;
-  const currentUserId = searchParams.get('currentUserId') || 'usr_rahul';
+  const currentUserId = searchParams.get('currentUserId') || 'usr_arihant';
 
   const conversations = getConversations(orgId, { filter, search, currentUserId });
   return NextResponse.json(conversations);
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { organizationId = 'org_acme', conversationId, action, assignedUserId, assignedUserName, status } = body;
+    const { organizationId = 'org_dobcy', conversationId, action, assignedUserId, assignedUserName, status } = body;
 
     if (!conversationId) {
       return NextResponse.json({ error: 'conversationId is required' }, { status: 400 });

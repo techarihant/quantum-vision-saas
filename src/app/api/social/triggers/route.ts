@@ -4,7 +4,7 @@ import { CommentTrigger } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const orgId = searchParams.get('orgId') || 'org_acme';
+  const orgId = searchParams.get('orgId') || 'org_dobcy';
   const db = getDB();
   const triggers = db.commentTriggers.filter((t) => t.organizationId === orgId);
   return NextResponse.json(triggers);
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
-      organizationId = 'org_acme',
+      organizationId = 'org_dobcy',
       name,
       platform = 'instagram',
       postId,

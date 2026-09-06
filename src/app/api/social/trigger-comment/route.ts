@@ -5,7 +5,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
-      organizationId = 'org_acme',
+      organizationId = 'org_dobcy',
       platform = 'instagram',
       username = 'rahul123',
       postId = 'post_reel_diwali',

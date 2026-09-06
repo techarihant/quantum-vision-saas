@@ -4,7 +4,7 @@ import { dispatchWhatsAppMessage } from '@/lib/whatsapp/dispatcher';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const orgId = searchParams.get('orgId') || 'org_acme';
+  const orgId = searchParams.get('orgId') || 'org_dobcy';
   const campaigns = getCampaigns(orgId);
   return NextResponse.json(campaigns);
 }
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
-      organizationId = 'org_acme',
+      organizationId = 'org_dobcy',
       name,
       description = '',
       targetAudienceType,

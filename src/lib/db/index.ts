@@ -295,7 +295,14 @@ export function addMessage(orgId: string, messageData: Omit<Message, 'id' | 'org
   db.messages.push(newMessage);
 
   // Update or create corresponding conversation
-  let conv = db.conversations.find((c) => c.organizationId === orgId && c.id === messageData.conversationId);
+  const cleanPhone = messageData.whatsappNumber ? messageData.whatsappNumber.replace(/[^0-9]/g, '') : '';
+  let conv = db.conversations.find(
+    (c) =>
+      c.organizationId === orgId &&
+      (c.id === messageData.conversationId ||
+        (messageData.contactId && c.contactId === messageData.contactId) ||
+        (cleanPhone && c.whatsappNumber.replace(/[^0-9]/g, '') === cleanPhone))
+  );
   if (!conv) {
     conv = {
       id: messageData.conversationId,

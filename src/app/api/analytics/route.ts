@@ -3,7 +3,7 @@ import { getDB } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const orgId = searchParams.get('orgId') || 'org_acme';
+  const orgId = searchParams.get('orgId') || 'org_dobcy';
   const timeRange = searchParams.get('range') || '7d';
 
   const db = getDB();

@@ -4,7 +4,7 @@ import { getDB, createContact, logAudit, saveDB } from '@/lib/db';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { organizationId = 'org_acme', rows, columnMapping } = body;
+    const { organizationId = 'org_dobcy', rows, columnMapping } = body;
 
     if (!Array.isArray(rows)) {
       return NextResponse.json({ error: 'Invalid rows payload' }, { status: 400 });

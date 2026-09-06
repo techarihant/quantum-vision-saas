@@ -3,7 +3,7 @@ import { getInternalNotes, addInternalNote } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const orgId = searchParams.get('orgId') || 'org_acme';
+  const orgId = searchParams.get('orgId') || 'org_dobcy';
   const conversationId = searchParams.get('conversationId');
 
   if (!conversationId) {
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { organizationId = 'org_acme', conversationId, userId = 'usr_rahul', userName = 'Rahul Sharma', note } = body;
+    const { organizationId = 'org_dobcy', conversationId, userId = 'usr_arihant', userName = 'Arihant', note } = body;
 
     if (!conversationId || !note) {
       return NextResponse.json({ error: 'conversationId and note content are required' }, { status: 400 });

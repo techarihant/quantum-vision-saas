@@ -4,7 +4,7 @@ import { LeadMagnet } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const orgId = searchParams.get('orgId') || 'org_acme';
+  const orgId = searchParams.get('orgId') || 'org_dobcy';
   const db = getDB();
   const magnets = db.leadMagnets.filter((m) => m.organizationId === orgId);
   return NextResponse.json(magnets);
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
-      organizationId = 'org_acme',
+      organizationId = 'org_dobcy',
       name,
       type = 'PDF',
       triggerKeyword = 'GUIDE',
