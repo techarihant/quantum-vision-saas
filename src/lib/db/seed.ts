@@ -148,7 +148,21 @@ export function generateSeedData(): DatabaseState {
   const tags: Tag[] = [];
 
   const segments: Segment[] = [];
-  const templates: Template[] = [];
+  const templates: Template[] = [
+    {
+      id: 'tpl_call_number',
+      organizationId: primaryOrgId,
+      name: 'call_number',
+      category: 'MARKETING',
+      language: 'en',
+      status: 'APPROVED',
+      headerText: '🪔 Welcome to MastJaipur - मस्त जयपुर!',
+      bodyText: 'Hello {{1}}, thank you for contacting MastJaipur! Call our customer support or reply to this message for instant assistance.',
+      footerText: 'Reply STOP to opt out.',
+      variables: ['1'],
+      updatedAt: new Date().toISOString()
+    }
+  ];
 
   const contacts: Contact[] = [];
   const campaigns: Campaign[] = [];

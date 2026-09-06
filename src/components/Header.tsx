@@ -87,12 +87,11 @@ export function Header() {
           )}
         </div>
 
-        {/* Status Indicator */}
-        <div className="hidden md:flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs">
-          <span className={`h-2 w-2 rounded-full ${whatsappAccount?.accountStatus === 'CONNECTED' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-          <span className="text-slate-700 font-medium text-[11px]">
-            {isDemoMode ? 'Demo Simulator' : 'WhatsApp API'} :{' '}
-            <strong className="text-emerald-600">{whatsappAccount?.accountStatus || 'CONNECTED'}</strong>
+        {/* Live Session Status Indicator */}
+        <div className="hidden lg:flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/70 px-3 py-1 text-xs">
+          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-emerald-900 font-bold text-[11px] flex items-center gap-1">
+            🟢 Live Session: <span className="font-mono text-emerald-700">07h 58m</span>
           </span>
         </div>
       </div>
@@ -117,12 +116,6 @@ export function Header() {
           <span>New Campaign</span>
         </Link>
 
-        {/* Notifications */}
-        <button className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100">
-          <Bell size={16} />
-          <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-emerald-500" />
-        </button>
-
         {/* User Profile Dropdown */}
         <div className="relative">
           <button
@@ -139,31 +132,29 @@ export function Header() {
           </button>
 
           {userOpen && (
-            <div className="absolute right-0 mt-2 w-52 rounded-xl border border-slate-200 bg-white p-2 shadow-xl z-50">
-              <div className="border-b border-slate-100 px-2 pb-2 mb-1">
+            <div className="absolute right-0 mt-2 w-60 rounded-xl border border-slate-200 bg-white p-2 shadow-xl z-50 space-y-2">
+              <div className="border-b border-slate-100 px-2 pb-2">
                 <div className="text-xs font-bold text-slate-900">{currentUser.name}</div>
-                <div className="text-[10px] text-slate-500">{currentUser.email}</div>
-                <span className="mt-1 inline-block rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-700 border border-emerald-200">
-                  Role: {currentUser.role}
-                </span>
+                <div className="text-[10px] text-slate-500 font-mono">arihant@quantumvision.in</div>
+                <div className="mt-1 flex items-center justify-between">
+                  <span className="inline-block rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-700 border border-emerald-200">
+                    Master Admin (Live)
+                  </span>
+                  <span className="text-[9px] font-bold text-slate-400 font-mono">Session: 8h</span>
+                </div>
               </div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">
-                Switch Role / User
-              </div>
-              {users.map((u) => (
-                <button
-                  key={u.id}
-                  onClick={() => {
-                    setCurrentUser(u);
-                    setUserOpen(false);
-                  }}
-                  className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-xs ${
-                    u.id === currentUser.id ? 'bg-slate-100 text-emerald-700 font-bold' : 'text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <span>{u.name} ({u.role})</span>
-                </button>
-              ))}
+
+              <Link
+                href="/auth/login"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    document.cookie = 'qv_auth_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                  }
+                }}
+                className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50"
+              >
+                <span>🔒 Lock / Sign Out</span>
+              </Link>
             </div>
           )}
         </div>
