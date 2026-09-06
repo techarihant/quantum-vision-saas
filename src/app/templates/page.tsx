@@ -27,7 +27,18 @@ export default function TemplatesPage() {
 
   const loadTemplates = async () => {
     try {
-      const res = await fetch(`/api/templates?organizationId=${currentOrg.id}`);
+      let url = `/api/templates?organizationId=${currentOrg.id}`;
+      const savedLocal = typeof window !== 'undefined' ? localStorage.getItem(`qv_settings_${currentOrg.id}`) : null;
+      if (savedLocal) {
+        try {
+          const parsed = JSON.parse(savedLocal);
+          if (parsed.wbaId && parsed.accessToken) {
+            url += `&wbaId=${encodeURIComponent(parsed.wbaId)}&accessToken=${encodeURIComponent(parsed.accessToken)}`;
+          }
+        } catch (e) {}
+      }
+
+      const res = await fetch(url);
       const data = await res.json();
       if (data.success && Array.isArray(data.templates)) {
         setTemplates(data.templates);

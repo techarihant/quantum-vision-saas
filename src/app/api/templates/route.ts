@@ -7,17 +7,23 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const orgId = searchParams.get('organizationId') || 'org_dobcy';
 
+    const queryWbaId = searchParams.get('wbaId');
+    const queryAccessToken = searchParams.get('accessToken');
+
     let templates = getTemplates(orgId);
     const account = getWhatsAppAccount(orgId);
 
+    const wbaId = queryWbaId || account?.wbaId;
+    const accessToken = queryAccessToken || account?.accessToken;
+
     // If Meta WBA ID & Access Token configured, fetch live templates directly from Meta Graph API
-    if (account?.wbaId && account?.accessToken) {
+    if (wbaId && accessToken) {
       try {
         const metaRes = await fetch(
-          `https://graph.facebook.com/v21.0/${account.wbaId}/message_templates?limit=100`,
+          `https://graph.facebook.com/v21.0/${wbaId}/message_templates?limit=100`,
           {
             headers: {
-              Authorization: `Bearer ${account.accessToken}`
+              Authorization: `Bearer ${accessToken}`
             }
           }
         );
@@ -58,6 +64,25 @@ export async function GET(request: Request) {
       } catch (err) {
         console.error('Failed to sync templates from Meta Graph API:', err);
       }
+    }
+
+    // Default Fallback: Ensure call_number is always present if no templates exist
+    if (templates.length === 0) {
+      const defaultCallNumber: Template = {
+        id: 'tpl_call_number',
+        organizationId: orgId,
+        name: 'call_number',
+        category: 'MARKETING',
+        language: 'en',
+        status: 'APPROVED',
+        headerText: '🪔 Welcome to MastJaipur - मस्त जयपुर!',
+        bodyText: 'Hello {{1}}, thank you for contacting MastJaipur! Call our customer support or reply to this message for instant assistance.',
+        footerText: 'Reply STOP to opt out.',
+        variables: ['1'],
+        updatedAt: new Date().toISOString()
+      };
+      createTemplate(orgId, defaultCallNumber);
+      templates = [defaultCallNumber];
     }
 
     return NextResponse.json({ success: true, templates });
