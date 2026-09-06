@@ -12,6 +12,43 @@ export default function SocialConversationsPage() {
   const [replyText, setReplyText] = useState('');
   const [chatMessages, setChatMessages] = useState<any[]>([]);
 
+  const loadLeadMessages = async (lead: SocialLead) => {
+    try {
+      const convId = `conv_social_${lead.id}`;
+      const res = await fetch(`/api/inbox/messages?orgId=${currentOrg.id}&conversationId=${convId}`);
+      if (res.ok) {
+        const msgs = await res.json();
+        if (msgs && msgs.length > 0) {
+          setChatMessages(
+            msgs.map((m: any) => ({
+              id: m.id,
+              sender: m.direction === 'OUTBOUND' ? 'system' : 'user',
+              text: m.content,
+              time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }))
+          );
+          return;
+        }
+      }
+    } catch (e) {}
+
+    // Fallback default message list
+    setChatMessages([
+      {
+        id: 'm1',
+        sender: 'user',
+        text: `Commented: "${lead.commentText || lead.keyword || 'PRICE'}" on Instagram Post`,
+        time: 'Just now'
+      },
+      {
+        id: 'm2',
+        sender: 'system',
+        text: `Hi @${lead.username}! 👋 Thanks for commenting. Reply with your WhatsApp phone number to get instant discount codes & offers.`,
+        time: 'Just now'
+      }
+    ]);
+  };
+
   useEffect(() => {
     fetch(`/api/social/leads?orgId=${currentOrg.id}`)
       .then((res) => res.json())
@@ -19,32 +56,7 @@ export default function SocialConversationsPage() {
         setLeads(data);
         if (data.length > 0) {
           setSelectedLead(data[0]);
-          setChatMessages([
-            {
-              id: 'm1',
-              sender: 'user',
-              text: `Commented: "${data[0].commentText || data[0].source}" on Reel`,
-              time: '10:14 AM'
-            },
-            {
-              id: 'm2',
-              sender: 'system',
-              text: `Hi @${data[0].username}! 👋 Thanks for commenting. Reply with your WhatsApp phone number to claim your exclusive discount guide!`,
-              time: '10:14 AM'
-            },
-            {
-              id: 'm3',
-              sender: 'user',
-              text: `My WhatsApp number is +91 98765 43210! Please send details.`,
-              time: '10:16 AM'
-            },
-            {
-              id: 'm4',
-              sender: 'system',
-              text: `Awesome! We have opted you in for WhatsApp updates. Click here to open WhatsApp directly: https://wa.me/919876543210`,
-              time: '10:16 AM'
-            }
-          ]);
+          loadLeadMessages(data[0]);
         }
       });
   }, [currentOrg]);
@@ -91,20 +103,7 @@ export default function SocialConversationsPage() {
                   key={lead.id}
                   onClick={() => {
                     setSelectedLead(lead);
-                    setChatMessages([
-                      {
-                        id: 'm1',
-                        sender: 'user',
-                        text: `Commented: "${lead.commentText || lead.source}" on Post`,
-                        time: 'Just now'
-                      },
-                      {
-                        id: 'm2',
-                        sender: 'system',
-                        text: `Hi @${lead.username}! Reply with your WhatsApp number to receive your free offer.`,
-                        time: 'Just now'
-                      }
-                    ]);
+                    loadLeadMessages(lead);
                   }}
                   className={`p-4 cursor-pointer hover:bg-slate-50 transition-colors flex items-center gap-3 ${
                     selectedLead?.id === lead.id ? 'bg-purple-50/70 border-l-4 border-purple-600' : ''

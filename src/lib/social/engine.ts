@@ -82,6 +82,73 @@ export function processSocialCommentEvent(params: CommentEventParams) {
   };
 
   db.socialMessages.push(dmMsg);
+
+  // Sync to Shared Inbox Conversations & Messages for instant Inbox visibility
+  const convId = `conv_social_${lead.id}`;
+  let conv = db.conversations.find((c) => c.organizationId === orgId && (c.id === convId || c.contactName === `@${params.username}`));
+
+  if (!conv) {
+    conv = {
+      id: convId,
+      organizationId: orgId,
+      contactId: `cnt_social_${params.username}`,
+      contactName: `@${params.username}`,
+      whatsappNumber: `@${params.username}`,
+      channel: (params.platform === 'facebook' ? 'facebook' : 'instagram') as any,
+      status: 'OPEN',
+      unreadCount: 1,
+      lastMessage: autoText,
+      lastMessageDirection: 'OUTBOUND',
+      lastMessageAt: now,
+      tags: ['Instagram Lead', keyword],
+      createdAt: now
+    };
+    db.conversations.unshift(conv);
+  } else {
+    conv.lastMessage = autoText;
+    conv.lastMessageDirection = 'OUTBOUND';
+    conv.lastMessageAt = now;
+    conv.unreadCount += 1;
+  }
+
+  // Create message entries in db.messages for thread display in Shared Inbox
+  const inboundCommentMsg = {
+    id: `msg_in_${Date.now()}`,
+    organizationId: orgId,
+    conversationId: conv.id,
+    contactId: conv.contactId,
+    contactName: conv.contactName,
+    whatsappNumber: conv.whatsappNumber,
+    direction: 'INBOUND',
+    platformMessageId: `mid_in_${Math.random().toString(36).substring(2)}`,
+    messageType: 'TEXT',
+    content: `Commented: "${params.commentText}" on Post`,
+    status: 'READ',
+    sentAt: new Date(Date.now() - 2000).toISOString(),
+    deliveredAt: new Date(Date.now() - 2000).toISOString(),
+    createdAt: new Date(Date.now() - 2000).toISOString()
+  };
+
+  const outboundDmMsg = {
+    id: `msg_out_${Date.now()}`,
+    organizationId: orgId,
+    conversationId: conv.id,
+    contactId: conv.contactId,
+    contactName: conv.contactName,
+    whatsappNumber: conv.whatsappNumber,
+    direction: 'OUTBOUND',
+    platformMessageId: `mid_out_${Math.random().toString(36).substring(2)}`,
+    messageType: 'TEXT',
+    content: autoText,
+    status: 'DELIVERED',
+    sentAt: now,
+    deliveredAt: now,
+    createdAt: now
+  };
+
+  db.messages.push(inboundCommentMsg as any);
+  db.messages.push(outboundDmMsg as any);
+
   saveDB(db);
 
   logAudit(

@@ -26,6 +26,7 @@ export default function SharedInboxPage() {
   const [contactDetail, setContactDetail] = useState<Contact | null>(null);
 
   const [filter, setFilter] = useState<'ALL' | 'UNREAD' | 'ASSIGNED_TO_ME' | 'UNASSIGNED' | 'OPEN' | 'RESOLVED'>('ALL');
+  const [channelFilter, setChannelFilter] = useState<'ALL' | 'whatsapp' | 'instagram' | 'facebook'>('ALL');
   const [search, setSearch] = useState('');
   const [replyMode, setReplyMode] = useState<'whatsapp' | 'internal_note'>('whatsapp');
   const [replyText, setReplyText] = useState('');
@@ -220,10 +221,38 @@ export default function SharedInboxPage() {
 
           {/* Platform Channel Tabs */}
           <div className="grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-1 text-[11px] font-bold">
-            <button className="rounded-lg bg-white py-1 text-slate-900 shadow-2xs">All</button>
-            <button className="rounded-lg py-1 text-slate-600 hover:text-slate-900">WhatsApp</button>
-            <button className="rounded-lg py-1 text-slate-600 hover:text-slate-900">Instagram</button>
-            <button className="rounded-lg py-1 text-slate-600 hover:text-slate-900">Facebook</button>
+            <button
+              onClick={() => setChannelFilter('ALL')}
+              className={`rounded-lg py-1 transition-all ${
+                channelFilter === 'ALL' ? 'bg-white text-slate-900 shadow-2xs font-extrabold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setChannelFilter('whatsapp')}
+              className={`rounded-lg py-1 transition-all ${
+                channelFilter === 'whatsapp' ? 'bg-white text-slate-900 shadow-2xs font-extrabold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              WhatsApp
+            </button>
+            <button
+              onClick={() => setChannelFilter('instagram')}
+              className={`rounded-lg py-1 transition-all ${
+                channelFilter === 'instagram' ? 'bg-white text-slate-900 shadow-2xs font-extrabold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Instagram
+            </button>
+            <button
+              onClick={() => setChannelFilter('facebook')}
+              className={`rounded-lg py-1 transition-all ${
+                channelFilter === 'facebook' ? 'bg-white text-slate-900 shadow-2xs font-extrabold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Facebook
+            </button>
           </div>
 
           <div className="relative">
@@ -263,13 +292,16 @@ export default function SharedInboxPage() {
 
         {/* Conversations Scrollable List */}
         <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-          {conversations.length === 0 ? (
+          {conversations.filter((c) => channelFilter === 'ALL' || (c.channel || 'whatsapp').toLowerCase() === channelFilter).length === 0 ? (
             <div className="p-8 text-center text-xs text-slate-500">
-              No conversations found.
+              No conversations found for {channelFilter === 'ALL' ? 'selected filter' : channelFilter}.
             </div>
           ) : (
-            conversations.map((conv) => {
+            conversations
+              .filter((c) => channelFilter === 'ALL' || (c.channel || 'whatsapp').toLowerCase() === channelFilter)
+              .map((conv) => {
               const isActive = conv.id === activeConvId;
+              const isSocial = conv.channel === 'instagram' || conv.channel === 'facebook';
               return (
                 <button
                   key={conv.id}
@@ -279,7 +311,13 @@ export default function SharedInboxPage() {
                   }`}
                 >
                   <div className="relative">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-tr from-emerald-600 to-teal-600 font-bold text-white text-xs shadow-xs">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-full font-bold text-white text-xs shadow-xs ${
+                      conv.channel === 'instagram'
+                        ? 'bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600'
+                        : conv.channel === 'facebook'
+                        ? 'bg-blue-600'
+                        : 'bg-gradient-to-tr from-emerald-600 to-teal-600'
+                    }`}>
                       {conv.contactName[0]}
                     </div>
                     {conv.unreadCount > 0 && (
@@ -291,7 +329,12 @@ export default function SharedInboxPage() {
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <span className="truncate text-xs font-bold text-slate-900">{conv.contactName}</span>
+                      <span className="truncate text-xs font-bold text-slate-900 flex items-center gap-1">
+                        {conv.contactName}
+                        {conv.channel === 'instagram' && (
+                          <span className="rounded bg-purple-100 px-1 py-0.2 text-[9px] font-bold text-purple-800">Insta</span>
+                        )}
+                      </span>
                       <span className="text-[10px] text-slate-400">
                         {new Date(conv.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
