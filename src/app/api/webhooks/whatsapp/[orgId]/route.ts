@@ -3,6 +3,7 @@ import { getWhatsAppAccount, getDB, saveDB } from '@/lib/db';
 import { verifyMetaWebhookToken } from '@/lib/whatsapp/cloud-api';
 import { verifyMetaWebhookSignature } from '@/lib/security';
 import { simulateIncomingCustomerMessage } from '@/lib/whatsapp/demo-provider';
+import { processSocialCommentEvent } from '@/lib/social/engine';
 
 // Webhook Verification (GET request from Meta)
 export async function GET(req: NextRequest, { params }: { params: Promise<{ orgId: string }> }) {
@@ -35,6 +36,57 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ org
 
   try {
     const rawBody = await req.text();
+    const payload = JSON.parse(rawBody);
+
+    const entry = payload.entry?.[0];
+    const changes = entry?.changes?.[0];
+    const value = changes?.value;
+
+    // Handle Instagram Comment Webhook events if present
+    const field = changes?.field;
+    if (field === 'comments' || field === 'feed' || (value && (value.text || value.message) && !value.messages)) {
+      const commentText = value?.text || value?.message || 'PRICE';
+      const username = value?.from?.username || value?.sender_name || value?.from?.id || 'instagram_user';
+      const commentId = value?.id || value?.comment_id;
+      const postId = value?.media?.id || value?.post_id || entry?.id;
+
+      const result = processSocialCommentEvent({
+        organizationId: orgId,
+        platform: 'instagram',
+        username: username,
+        postId: postId,
+        commentText: commentText
+      });
+
+      // Send live Instagram Private Reply DM if access token available
+      const account = getWhatsAppAccount(orgId);
+      const accessToken = account?.accessToken || process.env.META_ACCESS_TOKEN;
+      if (accessToken && commentId && result.matchedTrigger) {
+        try {
+          const igAccId = entry?.id || '17841498203912';
+          await fetch(`https://graph.facebook.com/v21.0/${igAccId}/messages`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessToken}`
+            },
+            body: JSON.stringify({
+              recipient: { comment_id: commentId },
+              message: { text: result.matchedTrigger.autoDmText }
+            })
+          });
+        } catch (dmErr) {
+          console.error('[INSTAGRAM DM PRIVATE REPLY FAILED]', dmErr);
+        }
+      }
+
+      return NextResponse.json({ status: 'success', commentHandled: true });
+    }
+
+    if (!value) {
+      return NextResponse.json({ status: 'ignored_empty_payload' });
+    }
+
     const signatureHeader = req.headers.get('x-hub-signature-256');
 
     // Security check: Verify Meta SHA256 HMAC Signature using tenant credentials if configured
@@ -46,17 +98,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ org
       if (!isValidSig) {
         console.warn(`[SECURITY WARNING] Meta webhook signature header present, processing incoming event for org: ${orgId}`);
       }
-    }
-
-    const payload = JSON.parse(rawBody);
-
-    // Idempotency / Duplicate Webhook check
-    const entry = payload.entry?.[0];
-    const changes = entry?.changes?.[0];
-    const value = changes?.value;
-
-    if (!value) {
-      return NextResponse.json({ status: 'ignored_empty_payload' });
     }
 
     const db = getDB();
