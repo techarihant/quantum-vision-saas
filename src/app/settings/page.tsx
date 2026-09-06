@@ -118,6 +118,27 @@ export default function SettingsPage() {
     }
   };
 
+  const handlePurgeAllData = async () => {
+    if (confirm('Are you sure you want to permanently purge all demo contacts, conversations, templates, and tags from Vercel?')) {
+      try {
+        const res = await fetch('/api/admin/purge', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          if (typeof window !== 'undefined') {
+            localStorage.clear();
+          }
+          setToastMsg('🧹 ' + data.message);
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        }
+      } catch (err: any) {
+        alert('Error purging data: ' + err.message);
+      }
+    }
+  };
+
+
   return (
     <div className="space-y-6">
       <div>
@@ -304,13 +325,22 @@ export default function SettingsPage() {
         </div>
 
         <div className="flex items-center justify-between pt-4 border-t border-slate-200">
-          <button
-            type="button"
-            onClick={handleClearDemoData}
-            className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700 hover:bg-rose-100"
-          >
-            Clear / Reset Configuration
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleClearDemoData}
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+            >
+              Reset Inputs
+            </button>
+            <button
+              type="button"
+              onClick={handlePurgeAllData}
+              className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 flex items-center gap-1.5"
+            >
+              <span>🧹 Purge All Demo Data</span>
+            </button>
+          </div>
           <button
             type="submit"
             className="rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 flex items-center gap-2 shadow-xs"

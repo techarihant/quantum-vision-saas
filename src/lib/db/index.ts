@@ -59,6 +59,12 @@ export function getDB(): DatabaseState {
   return dbStateCache;
 }
 
+export function purgeDatabase(): DatabaseState {
+  dbStateCache = generateSeedData();
+  saveDB(dbStateCache);
+  return dbStateCache;
+}
+
 export function saveDB(state: DatabaseState) {
   dbStateCache = state;
 
@@ -370,6 +376,27 @@ export function getTemplates(orgId: string): Template[] {
   const db = getDB();
   return db.templates.filter((t) => t.organizationId === orgId);
 }
+
+export function createTemplate(orgId: string, templateData: Omit<Template, 'id' | 'organizationId' | 'updatedAt'>): Template {
+  const db = getDB();
+  const newTpl: Template = {
+    id: `tpl_${Date.now()}`,
+    organizationId: orgId,
+    ...templateData,
+    updatedAt: new Date().toISOString()
+  };
+  db.templates.unshift(newTpl);
+  saveDB(db);
+  return newTpl;
+}
+
+export function saveTemplates(orgId: string, templates: Template[]): void {
+  const db = getDB();
+  const otherOrgs = db.templates.filter((t) => t.organizationId !== orgId);
+  db.templates = [...templates, ...otherOrgs];
+  saveDB(db);
+}
+
 
 // Audit Log Helper
 export function logAudit(orgId: string, userId: string, userName: string, action: string, entity: string, details: string) {

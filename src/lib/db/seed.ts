@@ -145,12 +145,7 @@ export function generateSeedData(): DatabaseState {
     }
   ];
 
-  const tags: Tag[] = [
-    { id: 'tag_lead', organizationId: primaryOrgId, name: 'Lead', color: 'blue', count: 4250 },
-    { id: 'tag_customer', organizationId: primaryOrgId, name: 'Customer', color: 'emerald', count: 6800 },
-    { id: 'tag_vip', organizationId: primaryOrgId, name: 'VIP', color: 'amber', count: 1200 },
-    { id: 'tag_insta_lead', organizationId: primaryOrgId, name: 'Instagram Lead', color: 'rose', count: 850 }
-  ];
+  const tags: Tag[] = [];
 
   const segments: Segment[] = [];
   const templates: Template[] = [];
@@ -174,21 +169,7 @@ export function generateSeedData(): DatabaseState {
   const socialLeads: SocialLead[] = [];
   const socialMessages: SocialMessage[] = [];
   const leadMagnets: LeadMagnet[] = [];
-  const commentTriggers: CommentTrigger[] = [
-    {
-      id: 'trig_price',
-      organizationId: primaryOrgId,
-      name: 'Instagram Price Comment Auto-DM',
-      platform: 'instagram',
-      matchType: 'KEYWORD',
-      keywords: ['PRICE', 'COST', 'RATE', 'DETAILS'],
-      autoDmText: 'Hey! Thanks for commenting. Reply with your WhatsApp number to get instant details & offers!',
-      isEnabled: true,
-      totalTriggers: 0,
-      leadsCaptured: 0,
-      createdAt: new Date().toISOString()
-    }
-  ];
+  const commentTriggers: CommentTrigger[] = [];
 
   return {
     organizations,
