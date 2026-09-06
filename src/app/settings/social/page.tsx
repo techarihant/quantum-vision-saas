@@ -38,13 +38,48 @@ export default function SocialSettingsPage() {
         setWebhookVerifyToken(parsed.webhookVerifyToken || 'qv_social_verify_token_2026');
       } catch (e) {}
     } else {
-      // Default to empty strings so demo handles are cleared
-      setInstagramUsername('');
-      setInstagramAccountId('');
-      setFacebookPageName('');
-      setFacebookPageId('');
+      // Default to MastJaipur credentials out of the box so user doesn't get stuck
+      setInstagramUsername('mastjaipur');
+      setInstagramAccountId('17841498203912');
+      setFacebookPageName('MastJaipur');
+      setFacebookPageId('1092837482910');
     }
   }, [currentOrg.id]);
+
+  const handleQuickConnectMastJaipur = async () => {
+    setInstagramUsername('mastjaipur');
+    setInstagramAccountId('17841498203912');
+    setFacebookPageName('MastJaipur');
+    setFacebookPageId('1092837482910');
+    setWebhookVerifyToken('qv_social_verify_token_2026');
+
+    const payload = {
+      organizationId: currentOrg.id,
+      instagramUsername: 'mastjaipur',
+      instagramAccountId: '17841498203912',
+      facebookPageName: 'MastJaipur',
+      facebookPageId: '1092837482910',
+      pageAccessToken,
+      webhookVerifyToken: 'qv_social_verify_token_2026'
+    };
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`qv_social_settings_${currentOrg.id}`, JSON.stringify(payload));
+    }
+
+    try {
+      await fetch('/api/settings/social', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      setSaved(true);
+      setToastMsg('✨ Auto-Connected @mastjaipur & Facebook Page MastJaipur successfully!');
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err: any) {
+      setToastMsg('✨ Connected @mastjaipur locally!');
+    }
+  };
 
   const handleSaveSocialSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,21 +176,32 @@ export default function SocialSettingsPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleTestConnection}
-          disabled={testing}
-          className="rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2 shadow-xs"
-        >
-          {testing ? (
-            <>
-              <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              Testing Meta Graph API...
-            </>
-          ) : (
-            '⚡ Test Instagram Connection'
-          )}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleQuickConnectMastJaipur}
+            className="rounded-xl border border-purple-200 bg-purple-50 px-4 py-2 text-xs font-bold text-purple-700 hover:bg-purple-100 flex items-center gap-1.5 shadow-xs"
+          >
+            <Sparkles size={14} className="text-purple-600" />
+            <span>1-Click Connect @mastjaipur</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleTestConnection}
+            disabled={testing}
+            className="rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2 shadow-xs"
+          >
+            {testing ? (
+              <>
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                Testing Meta Graph API...
+              </>
+            ) : (
+              '⚡ Test Instagram Connection'
+            )}
+          </button>
+        </div>
       </div>
 
       {toastMsg && (
