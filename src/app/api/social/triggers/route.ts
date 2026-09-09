@@ -22,11 +22,17 @@ export async function POST(req: NextRequest) {
       matchType = 'KEYWORD',
       keywords = [],
       autoDmText,
-      leadMagnetId
+      leadMagnetId,
+      requireFollow = true,
+      followMessage,
+      followButtonText = '✨ Follow & Unlock PDF',
+      fileUrl = 'https://quantum-vision-saas.vercel.app/docs/mastjaipur_catalog.pdf',
+      fileType = 'PDF',
+      deliveryMessage
     } = body;
 
-    if (!name || !autoDmText) {
-      return NextResponse.json({ error: 'Name and automated DM text are required' }, { status: 400 });
+    if (!name) {
+      return NextResponse.json({ error: 'Trigger name is required' }, { status: 400 });
     }
 
     const db = getDB();
@@ -38,14 +44,21 @@ export async function POST(req: NextRequest) {
       postId,
       postTitle: postTitle || 'Instagram Post',
       matchType,
-      keywords: keywords.length > 0 ? keywords : ['PRICE', 'GUIDE', 'INFO'],
-      autoDmText,
+      keywords: keywords.length > 0 ? keywords : ['PRICE', 'GUIDE', 'INFO', 'DEMO'],
+      autoDmText: autoDmText || 'Thanks for commenting! Reply with your WhatsApp number for instant offers.',
       leadMagnetId,
+      requireFollow,
+      followMessage: followMessage || `👋 Hey! We noticed you are not following us yet on Instagram. Tap '✨ Follow @mastjaipur & Unlock' below to get your ${fileType || 'PDF / Photo Catalog'}!`,
+      followButtonText,
+      fileUrl,
+      fileType,
+      deliveryMessage: deliveryMessage || `🎉 Thank you for following us! Here is your requested ${fileType || 'PDF Catalog'} link:`,
       isEnabled: true,
       totalTriggers: 0,
       leadsCaptured: 0,
       createdAt: new Date().toISOString()
     };
+
 
     db.commentTriggers.unshift(trigger);
     saveDB(db);

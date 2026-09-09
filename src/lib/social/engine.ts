@@ -64,10 +64,17 @@ export function processSocialCommentEvent(params: CommentEventParams) {
     matchedTrigger.leadsCaptured += 1;
   }
 
-  // Create Outbound Instagram DM
-  const autoText = matchedTrigger
-    ? matchedTrigger.autoDmText
-    : `Thanks for commenting on our post! 👋 Reply with your WhatsApp phone number to get instant discount codes & offers.`;
+  // Construct Step 1 Follower-Gated DM Message
+  let autoText = '';
+  if (matchedTrigger?.requireFollow !== false) {
+    autoText = matchedTrigger?.followMessage || `👋 Hey @${params.username}! We noticed you are not following us yet on Instagram. Tap '✨ Follow @mastjaipur & Unlock' below to get your ${matchedTrigger?.fileType || 'PDF / Photo Catalog'}!`;
+  } else if (matchedTrigger?.autoDmText) {
+    autoText = matchedTrigger.autoDmText;
+  } else {
+    autoText = `Thanks for commenting on our post! 👋 Reply with your WhatsApp phone number to get instant discount codes & offers.`;
+  }
+
+  const buttonTitle = matchedTrigger?.followButtonText || '✨ Follow & Unlock PDF';
 
   const dmMsg: SocialMessage = {
     id: `smsg_${Date.now()}`,
@@ -76,7 +83,7 @@ export function processSocialCommentEvent(params: CommentEventParams) {
     direction: 'OUTBOUND',
     platformMessageId: `mid_${Math.random().toString(36).substring(2)}`,
     messageType: 'TEXT',
-    content: autoText,
+    content: `${autoText}\n\n[Button: ${buttonTitle}]`,
     status: 'DELIVERED',
     createdAt: now
   };
@@ -139,7 +146,7 @@ export function processSocialCommentEvent(params: CommentEventParams) {
     direction: 'OUTBOUND',
     platformMessageId: `mid_out_${Math.random().toString(36).substring(2)}`,
     messageType: 'TEXT',
-    content: autoText,
+    content: `${autoText}\n\n[Interactive Button: ${buttonTitle}]`,
     status: 'DELIVERED',
     sentAt: now,
     deliveredAt: now,
@@ -155,13 +162,73 @@ export function processSocialCommentEvent(params: CommentEventParams) {
     orgId,
     'sys_social_bot',
     'ManyChat Social Engine',
-    'Triggered Comment DM',
+    'Triggered Follower-Gated Comment DM',
     `User: @${params.username}`,
-    `Commented: "${params.commentText}". Matched Keyword: ${keyword}. DM dispatched.`
+    `Commented: "${params.commentText}". Matched Keyword: ${keyword}. Follow-Gated DM dispatched.`
   );
 
-  return { lead, message: dmMsg, matchedTrigger };
+  return { lead, message: dmMsg, matchedTrigger, autoText, buttonTitle };
 }
+
+// Step 2: Process Follow Button Click / Unlock & Lead Magnet Delivery
+export function processFollowUnlockEvent(params: { organizationId: string; username: string; triggerId?: string }) {
+  const db = getDB();
+  const orgId = params.organizationId;
+  const now = new Date().toISOString();
+
+  let lead = db.socialLeads.find((l) => l.organizationId === orgId && l.username === params.username);
+  const matchedTrigger = params.triggerId
+    ? db.commentTriggers.find((t) => t.id === params.triggerId)
+    : db.commentTriggers.find((t) => t.organizationId === orgId && t.isEnabled);
+
+  const fileUrl = matchedTrigger?.fileUrl || 'https://quantum-vision-saas.vercel.app/docs/mastjaipur_catalog.pdf';
+  const deliveryMsg = matchedTrigger?.deliveryMessage || `🎉 Thank you for following us! Here is your requested ${matchedTrigger?.fileType || 'PDF Catalog / Photo'} link:`;
+  const fullContent = `${deliveryMsg}\n\n📄 File Link: ${fileUrl}\n\nReply with your WhatsApp phone number to get instant order updates!`;
+
+  if (lead) {
+    lead.leadScore += 20; // +20 points for following & unlocking
+    lead.lastActivityAt = now;
+  }
+
+  // Find conversation
+  const conv = db.conversations.find((c) => c.organizationId === orgId && c.contactName === `@${params.username}`);
+  if (conv) {
+    conv.lastMessage = fullContent;
+    conv.lastMessageDirection = 'OUTBOUND';
+    conv.lastMessageAt = now;
+
+    db.messages.push({
+      id: `msg_unlock_${Date.now()}`,
+      organizationId: orgId,
+      conversationId: conv.id,
+      contactId: conv.contactId,
+      contactName: conv.contactName,
+      whatsappNumber: conv.whatsappNumber,
+      direction: 'OUTBOUND',
+      platformMessageId: `mid_unlock_${Math.random().toString(36).substring(2)}`,
+      messageType: 'DOCUMENT',
+      content: fullContent,
+      status: 'DELIVERED',
+      sentAt: now,
+      deliveredAt: now,
+      createdAt: now
+    } as any);
+  }
+
+  saveDB(db);
+
+  logAudit(
+    orgId,
+    'sys_social_bot',
+    'ManyChat Social Engine',
+    'Delivered Lead Magnet File',
+    `User: @${params.username}`,
+    `Unlocked & Delivered File: ${fileUrl}`
+  );
+
+  return { success: true, fileUrl, fullContent };
+}
+
 
 // Social to WhatsApp Handoff
 export function processSocialToWhatsAppHandoff(

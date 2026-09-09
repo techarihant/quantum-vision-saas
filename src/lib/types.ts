@@ -417,8 +417,15 @@ export interface CommentTrigger {
   keywords: string[];
   autoDmText: string;
   leadMagnetId?: string;
+  requireFollow?: boolean;
+  followMessage?: string;
+  followButtonText?: string;
+  fileUrl?: string;
+  fileType?: 'PDF' | 'PHOTO' | 'DOC' | 'LINK';
+  deliveryMessage?: string;
   isEnabled: boolean;
   totalTriggers: number;
   leadsCaptured: number;
   createdAt: string;
 }
+
