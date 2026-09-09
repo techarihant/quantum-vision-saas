@@ -230,9 +230,97 @@ export default function CommentTriggersPage() {
             </div>
           </div>
 
-          {debugInfo.metaError && (
-            <div className="rounded-xl border border-rose-900/50 bg-rose-950/40 p-3 text-xs text-rose-300 font-semibold">
-              ⚠️ Meta Token Warning: {debugInfo.metaError} (To send live DMs to non-test accounts, make sure your Page Access Token is saved in Settings).
+          {/* Quick Token Input Form if token is missing */}
+          {!debugInfo.metaTokenValid && (
+            <div className="rounded-xl border border-rose-900/50 bg-rose-950/40 p-4 space-y-3">
+              <div className="text-xs font-semibold text-rose-300 flex items-center justify-between">
+                <span>⚠️ Meta Token Warning: {debugInfo.metaError}</span>
+              </div>
+
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const tokenInput = (e.target as any).token.value;
+                  if (!tokenInput) return;
+                  try {
+                    const res = await fetch('/api/settings/social', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        organizationId: currentOrg.id,
+                        instagramUsername: 'mastjaipur',
+                        instagramAccountId: '17841498203912',
+                        facebookPageName: 'MastJaipur',
+                        facebookPageId: '1092837482910',
+                        pageAccessToken: tokenInput
+                      })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                      runDiagnosticCheck();
+                    }
+                  } catch (err) {
+                    console.error(err);
+                  }
+                }}
+                className="flex flex-col sm:flex-row items-center gap-2"
+              >
+                <input
+                  name="token"
+                  type="password"
+                  required
+                  placeholder="Paste your Meta Page Access Token (starts with EAA...)"
+                  className="w-full flex-1 rounded-xl border border-rose-800 bg-slate-950 px-3 py-2 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                />
+                <button
+                  type="submit"
+                  className="w-full sm:w-auto shrink-0 rounded-xl bg-purple-600 hover:bg-purple-700 px-4 py-2 text-xs font-bold text-white shadow-xs"
+                >
+                  ⚡ Save & Activate Token Now
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Recent Live Webhook Activity Logs */}
+          {debugInfo.recentWebhookLogs && debugInfo.recentWebhookLogs.length > 0 && (
+            <div className="space-y-2 pt-2 border-t border-slate-800">
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                <span>Recent Webhook Activity Logs</span>
+                <span className="text-purple-400 font-mono">{debugInfo.webhookLogsCount || debugInfo.recentWebhookLogs.length} events logged</span>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950 p-2">
+                <table className="w-full text-left text-[11px]">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-500">
+                      <th className="pb-1 font-semibold">Time</th>
+                      <th className="pb-1 font-semibold">Event</th>
+                      <th className="pb-1 font-semibold">User</th>
+                      <th className="pb-1 font-semibold">Comment / Input</th>
+                      <th className="pb-1 font-semibold">Matched</th>
+                      <th className="pb-1 font-semibold text-right">DM Delivery</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-900 text-slate-300">
+                    {debugInfo.recentWebhookLogs.slice(0, 5).map((log: any) => (
+                      <tr key={log.id}>
+                        <td className="py-1.5 font-mono text-slate-500">{new Date(log.timestamp).toLocaleTimeString()}</td>
+                        <td className="py-1.5 font-medium">{log.eventType}</td>
+                        <td className="py-1.5 font-bold text-purple-400">@{log.username}</td>
+                        <td className="py-1.5 font-mono text-slate-300">"{log.commentText}"</td>
+                        <td className="py-1.5 text-amber-400 font-semibold">{log.matchedKeyword || '-'}</td>
+                        <td className="py-1.5 text-right font-extrabold">
+                          {log.dmStatus === 'SENT' && <span className="text-emerald-400">🟢 SENT</span>}
+                          {log.dmStatus === 'FAILED_NO_TOKEN' && <span className="text-rose-400">🔴 NO TOKEN</span>}
+                          {log.dmStatus === 'FAILED_API_ERROR' && <span className="text-rose-400" title={log.error}>🔴 META API ERROR</span>}
+                          {log.dmStatus === 'RECEIVED' && <span className="text-blue-400">📥 RECEIVED</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
