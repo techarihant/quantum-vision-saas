@@ -135,6 +135,24 @@ export default function CommentTriggersPage() {
     }
   };
 
+  const [debugInfo, setDebugInfo] = useState<any>(null);
+  const [checkingDebug, setCheckingDebug] = useState(false);
+
+  const runDiagnosticCheck = async () => {
+    setCheckingDebug(true);
+    try {
+      const res = await fetch(`/api/social/debug?orgId=${currentOrg.id}`);
+      if (res.ok) {
+        const json = await res.json();
+        setDebugInfo(json);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCheckingDebug(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -147,6 +165,15 @@ export default function CommentTriggersPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={runDiagnosticCheck}
+            disabled={checkingDebug}
+            className="flex items-center gap-1.5 rounded-xl border border-purple-300 bg-purple-50 px-3.5 py-2 text-xs font-bold text-purple-900 hover:bg-purple-100 shadow-xs"
+          >
+            <ShieldCheck size={14} className="text-purple-600" />
+            <span>{checkingDebug ? 'Running Diagnostic...' : '🔍 Live Diagnostic Check'}</span>
+          </button>
+
           <button
             onClick={() => {
               setSimStep(1);
@@ -169,6 +196,48 @@ export default function CommentTriggersPage() {
           </button>
         </div>
       </div>
+
+      {/* Diagnostic Inspector Modal / Banner */}
+      {debugInfo && (
+        <div className="rounded-2xl border border-slate-200 bg-slate-900 p-5 text-white space-y-3 shadow-xl">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2 font-bold text-sm text-emerald-400">
+              <ShieldCheck size={18} /> System Diagnostic Report
+            </div>
+            <button onClick={() => setDebugInfo(null)} className="text-slate-400 hover:text-white font-bold text-xs">
+              ✕ Close Report
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+              <div className="text-[10px] text-slate-400 font-bold uppercase">Webhook Listener</div>
+              <div className="mt-1 font-extrabold text-emerald-400">{debugInfo.webhookStatus}</div>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+              <div className="text-[10px] text-slate-400 font-bold uppercase">Meta Access Token</div>
+              <div className={`mt-1 font-extrabold ${debugInfo.metaTokenValid ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {debugInfo.metaTokenValid ? '🟢 Valid & Connected' : '🔴 Unconfigured / Missing'}
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+              <div className="text-[10px] text-slate-400 font-bold uppercase">Active Triggers</div>
+              <div className="mt-1 font-extrabold text-purple-400">{debugInfo.activeTriggersCount} Active</div>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950 p-3">
+              <div className="text-[10px] text-slate-400 font-bold uppercase">Leads Captured</div>
+              <div className="mt-1 font-extrabold text-amber-400">{debugInfo.capturedLeadsCount} Leads</div>
+            </div>
+          </div>
+
+          {debugInfo.metaError && (
+            <div className="rounded-xl border border-rose-900/50 bg-rose-950/40 p-3 text-xs text-rose-300 font-semibold">
+              ⚠️ Meta Token Warning: {debugInfo.metaError} (To send live DMs to non-test accounts, make sure your Page Access Token is saved in Settings).
+            </div>
+          )}
+        </div>
+      )}
+
 
       {/* Meta Webhook Live Status & Setup Banner */}
       <div className="rounded-2xl border border-purple-200 bg-purple-50/60 p-5 space-y-3 shadow-xs">

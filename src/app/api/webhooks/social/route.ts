@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getWhatsAppAccount, getSocialAccounts, getDB } from '@/lib/db';
-import { processSocialCommentEvent } from '@/lib/social/engine';
+import { getWhatsAppAccount, getDB } from '@/lib/db';
+import { processSocialCommentEvent, processFollowUnlockEvent } from '@/lib/social/engine';
 
 // GET: Meta Webhook Verification Challenge & Status Inspector
 export async function GET(req: NextRequest) {
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   // 1. Meta Developer Console Handshake Verification
   if (mode === 'subscribe' && challenge) {
     if (token === expectedToken || token === 'qv_verify_token_dobcy_2026' || token) {
-      console.log('[META SOCIAL WEBHOOK VERIFIED]');
+      console.log('[META SOCIAL WEBHOOK VERIFIED SUCCESSFULLY]');
       return new NextResponse(challenge, {
         status: 200,
         headers: { 'Content-Type': 'text/plain' }
@@ -32,8 +32,7 @@ export async function GET(req: NextRequest) {
   });
 }
 
-
-// POST: Meta Event Receiver (Instagram & Facebook Comments & DMs)
+// POST: Meta Event Receiver (Instagram & Facebook Comments & Interactive Quick Reply DMs)
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
@@ -45,6 +44,8 @@ export async function POST(req: NextRequest) {
     const entries = payload.entry || [];
 
     for (const entry of entries) {
+      const igAccId = entry.id || '17841498203912';
+
       // 1. Handle Instagram Object Comments & Changes
       if (entry.changes && entry.changes.length > 0) {
         for (const change of entry.changes) {
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
             const commentId = val.id || val.comment_id;
             const postId = val.media?.id || val.post_id || entry.id;
 
-            // Run Social Comment Trigger Engine
+            // Run Social Comment Trigger Engine (Step 1 Follower-Gated DM)
             const result = processSocialCommentEvent({
               organizationId: orgId,
               platform: 'instagram',
@@ -69,48 +70,93 @@ export async function POST(req: NextRequest) {
               commentText: commentText
             });
 
-            // Send Real Instagram Private Reply DM via Meta Graph API if access token available
+            // Send Real Instagram Private Reply DM via Meta Graph API
             const waAcc = getWhatsAppAccount(orgId);
             const accessToken = waAcc?.accessToken || process.env.META_ACCESS_TOKEN;
 
-            if (accessToken && commentId && result.matchedTrigger) {
+            if (accessToken && commentId && !accessToken.startsWith('EAAG9x8b7c6d')) {
               try {
-                const igAccId = entry.id || '17841498203912';
+                const dmPayload = {
+                  recipient: { comment_id: commentId },
+                  message: {
+                    text: result.autoText,
+                    quick_replies: [
+                      {
+                        content_type: 'text',
+                        title: result.buttonTitle || '✨ Follow & Unlock',
+                        payload: 'UNLOCK_FILE'
+                      }
+                    ]
+                  }
+                };
+
                 const metaDmRes = await fetch(`https://graph.facebook.com/v21.0/${igAccId}/messages`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${accessToken}`
                   },
-                  body: JSON.stringify({
-                    recipient: { comment_id: commentId },
-                    message: { text: result.matchedTrigger.autoDmText }
-                  })
+                  body: JSON.stringify(dmPayload)
                 });
                 const metaDmData = await metaDmRes.json();
                 console.log('[META IG PRIVATE REPLY DM RESPONSE]', metaDmData);
               } catch (dmErr) {
                 console.error('[META IG PRIVATE REPLY DM FAILED]', dmErr);
               }
+            } else {
+              console.warn('[META WEBHOOK WARNING] Live Access token missing or unconfigured. DM stored in Inbox.');
             }
           }
         }
       }
 
-      // 2. Handle Direct Messaging (DMs)
+      // 2. Handle Direct Messaging & Quick Reply Taps (Step 2 Document Delivery)
       if (entry.messaging && entry.messaging.length > 0) {
         for (const msgObj of entry.messaging) {
           const senderId = msgObj.sender?.id;
           const text = msgObj.message?.text || '';
+          const quickReplyPayload = msgObj.message?.quick_reply?.payload;
 
-          if (text && senderId) {
-            processSocialCommentEvent({
-              organizationId: orgId,
-              platform: 'instagram',
-              username: `user_${senderId.slice(-4)}`,
-              postId: 'direct_dm',
-              commentText: text
-            });
+          if (senderId) {
+            const username = `user_${senderId.slice(-4)}`;
+
+            // If user clicked quick reply button "UNLOCK_FILE" or sent "unlock", run Step 2 File Delivery
+            if (quickReplyPayload === 'UNLOCK_FILE' || text.toUpperCase().includes('UNLOCK') || text.toUpperCase().includes('FOLLOW')) {
+              const unlockResult = processFollowUnlockEvent({
+                organizationId: orgId,
+                username: username
+              });
+
+              const waAcc = getWhatsAppAccount(orgId);
+              const accessToken = waAcc?.accessToken || process.env.META_ACCESS_TOKEN;
+
+              if (accessToken && !accessToken.startsWith('EAAG9x8b7c6d')) {
+                try {
+                  await fetch(`https://graph.facebook.com/v21.0/${igAccId}/messages`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${accessToken}`
+                    },
+                    body: JSON.stringify({
+                      recipient: { id: senderId },
+                      message: { text: unlockResult.fullContent }
+                    })
+                  });
+                } catch (dmErr) {
+                  console.error('[META STEP 2 DOCUMENT DELIVERY FAILED]', dmErr);
+                }
+              }
+            } else {
+              // Standard DM message
+              processSocialCommentEvent({
+                organizationId: orgId,
+                platform: 'instagram',
+                username: username,
+                postId: 'direct_dm',
+                commentText: text
+              });
+            }
           }
         }
       }
