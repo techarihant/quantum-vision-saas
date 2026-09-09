@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getWhatsAppAccount, getDB } from '@/lib/db';
+import { getDB, getLiveMetaAccessToken, getWebhookLogs } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const orgId = searchParams.get('orgId') || 'org_dobcy';
 
-  const waAcc = getWhatsAppAccount(orgId);
   const db = getDB();
-  const accessToken = waAcc?.accessToken || process.env.META_ACCESS_TOKEN;
+  const accessToken = getLiveMetaAccessToken(orgId);
 
   let metaTokenValid = false;
   let metaProfile: any = null;
   let metaError: string | null = null;
 
-  if (accessToken && !accessToken.startsWith('EAAG9x8b7c6d')) {
+  if (accessToken) {
     try {
       const res = await fetch(`https://graph.facebook.com/v21.0/me?fields=id,name`, {
         headers: { Authorization: `Bearer ${accessToken}` }
@@ -34,6 +33,7 @@ export async function GET(req: NextRequest) {
 
   const triggers = db.commentTriggers.filter((t) => t.organizationId === orgId);
   const leads = db.socialLeads.filter((l) => l.organizationId === orgId);
+  const logs = getWebhookLogs(orgId);
 
   return NextResponse.json({
     webhookStatus: 'ACTIVE',

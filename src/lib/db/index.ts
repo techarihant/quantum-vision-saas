@@ -439,6 +439,31 @@ export function saveTemplates(orgId: string, templates: Template[]): void {
 }
 
 
+// Helper to get a verified, live Meta Access Token across WhatsApp, Social accounts, and Environment variables
+export function getLiveMetaAccessToken(orgId: string): string | null {
+  const db = getDB();
+  
+  // 1. Check WhatsApp Account
+  const waAcc = db.whatsappAccounts.find((w) => w.organizationId === orgId);
+  if (waAcc?.accessToken && waAcc.accessToken.trim() && !waAcc.accessToken.startsWith('EAAG9x8b7c6d')) {
+    return waAcc.accessToken.trim();
+  }
+
+  // 2. Check Social Accounts
+  const socialAcc = db.socialAccounts.find((s) => s.organizationId === orgId && s.accessToken);
+  if (socialAcc?.accessToken && socialAcc.accessToken.trim() && !socialAcc.accessToken.startsWith('EAAG9x8b7c6d')) {
+    return socialAcc.accessToken.trim();
+  }
+
+  // 3. Check Environment Variables
+  const envToken = process.env.META_ACCESS_TOKEN || process.env.PAGE_ACCESS_TOKEN || process.env.INSTAGRAM_PAGE_ACCESS_TOKEN;
+  if (envToken && envToken.trim() && !envToken.startsWith('EAAG9x8b7c6d')) {
+    return envToken.trim();
+  }
+
+  return null;
+}
+
 // Social Accounts
 export function getSocialAccounts(orgId: string): SocialAccount[] {
   const db = getDB();
@@ -458,11 +483,17 @@ export function saveSocialAccount(orgId: string, accountData: Partial<SocialAcco
       accountId: accountData.accountId || '',
       accountName: accountData.accountName || '',
       username: accountData.username || '',
+      accessToken: accountData.accessToken || '',
       status: 'CONNECTED',
       connectedAt: new Date().toISOString()
     };
     db.socialAccounts.push(existing);
   }
+
+  if (accountData.accessToken && accountData.accessToken.trim() && !accountData.accessToken.startsWith('EAAG9x8b7c6d')) {
+    updateWhatsAppAccount(orgId, { accessToken: accountData.accessToken.trim() });
+  }
+
   saveDB(db);
   return existing;
 }
@@ -483,4 +514,34 @@ export function logAudit(orgId: string, userId: string, userName: string, action
   db.auditLogs.unshift(entry);
   saveDB(db);
 }
+
+export interface WebhookActivityLog {
+  id: string;
+  organizationId: string;
+  timestamp: string;
+  eventType: string;
+  username: string;
+  commentText: string;
+  matchedKeyword?: string;
+  dmStatus: 'SENT' | 'SIMULATED' | 'FAILED_NO_TOKEN' | 'FAILED_API_ERROR' | 'RECEIVED';
+  error?: string;
+}
+
+const localWebhookLogs: WebhookActivityLog[] = [];
+
+export function recordWebhookLog(entry: Omit<WebhookActivityLog, 'id' | 'timestamp'>) {
+  const newLog: WebhookActivityLog = {
+    id: `wlog_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+    timestamp: new Date().toISOString(),
+    ...entry
+  };
+  localWebhookLogs.unshift(newLog);
+  if (localWebhookLogs.length > 50) localWebhookLogs.pop();
+  return newLog;
+}
+
+export function getWebhookLogs(orgId: string): WebhookActivityLog[] {
+  return localWebhookLogs.filter((l) => l.organizationId === orgId);
+}
+
 

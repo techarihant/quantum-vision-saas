@@ -324,6 +324,7 @@ export interface SocialAccount {
   accountName: string;
   username: string;
   avatar?: string;
+  accessToken?: string;
   status: 'CONNECTED' | 'DISCONNECTED' | 'REAUTH_NEEDED' | 'ERROR';
   connectedAt: string;
 }

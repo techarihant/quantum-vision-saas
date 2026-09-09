@@ -33,6 +33,7 @@ export async function POST(request: Request) {
       username: cleanInstaUser,
       accountId: instagramAccountId.trim(),
       accountName: cleanInstaUser ? `@${cleanInstaUser}` : 'Instagram Business',
+      accessToken: pageAccessToken.trim(),
       status: instagramAccountId ? 'CONNECTED' : 'DISCONNECTED'
     });
 
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
       accountName: facebookPageName.trim() || 'Facebook Page',
       accountId: facebookPageId.trim(),
       username: facebookPageId.trim(),
+      accessToken: pageAccessToken.trim(),
       status: facebookPageId ? 'CONNECTED' : 'DISCONNECTED'
     });
 
@@ -49,10 +51,11 @@ export async function POST(request: Request) {
     let liveDetails = null;
     let apiError = null;
 
-    if (instagramAccountId && pageAccessToken) {
+    if (pageAccessToken.trim() && !pageAccessToken.startsWith('EAAG9x8b7c6d')) {
       try {
+        const testTarget = instagramAccountId.trim() || 'me';
         const res = await fetch(
-          `https://graph.facebook.com/v21.0/${instagramAccountId}?fields=id,username,name&access_token=${pageAccessToken}`
+          `https://graph.facebook.com/v21.0/${testTarget}?fields=id,username,name&access_token=${pageAccessToken.trim()}`
         );
         const data = await res.json();
         if (res.ok && data.id) {

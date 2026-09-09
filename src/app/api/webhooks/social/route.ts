@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getWhatsAppAccount, getDB } from '@/lib/db';
+import { getWhatsAppAccount, getDB, recordWebhookLog, getLiveMetaAccessToken } from '@/lib/db';
 import { processSocialCommentEvent, processFollowUnlockEvent } from '@/lib/social/engine';
 
 // GET: Meta Webhook Verification Challenge & Status Inspector
@@ -71,11 +71,14 @@ export async function POST(req: NextRequest) {
             });
 
             // Send Real Instagram Private Reply DM via Meta Graph API
-            const waAcc = getWhatsAppAccount(orgId);
-            const accessToken = waAcc?.accessToken || process.env.META_ACCESS_TOKEN;
+            const accessToken = getLiveMetaAccessToken(orgId);
 
-            if (accessToken && commentId && !accessToken.startsWith('EAAG9x8b7c6d')) {
+            let status: 'SENT' | 'FAILED_NO_TOKEN' | 'FAILED_API_ERROR' = 'FAILED_NO_TOKEN';
+            let apiErrorMsg: string | undefined = undefined;
+
+            if (accessToken && commentId) {
               try {
+                // Primary attempt: Private reply with interactive Quick Reply button
                 const dmPayload = {
                   recipient: { comment_id: commentId },
                   message: {
@@ -90,7 +93,7 @@ export async function POST(req: NextRequest) {
                   }
                 };
 
-                const metaDmRes = await fetch(`https://graph.facebook.com/v21.0/${igAccId}/messages`, {
+                let metaDmRes = await fetch(`https://graph.facebook.com/v21.0/${igAccId}/messages`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
@@ -98,17 +101,59 @@ export async function POST(req: NextRequest) {
                   },
                   body: JSON.stringify(dmPayload)
                 });
-                const metaDmData = await metaDmRes.json();
-                console.log('[META IG PRIVATE REPLY DM RESPONSE]', metaDmData);
-              } catch (dmErr) {
+                let metaDmData = await metaDmRes.json();
+
+                // If quick_replies fails or is unsupported for Private Reply, retry with text-only payload
+                if (!metaDmRes.ok && metaDmData.error) {
+                  console.warn('[META IG PRIVATE REPLY RETRY WITH SIMPLE TEXT]', metaDmData.error);
+                  const textOnlyPayload = {
+                    recipient: { comment_id: commentId },
+                    message: {
+                      text: `${result.autoText}\n\n👉 Reply 'UNLOCK' to get your instant PDF catalog/download!`
+                    }
+                  };
+
+                  metaDmRes = await fetch(`https://graph.facebook.com/v21.0/${igAccId}/messages`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${accessToken}`
+                    },
+                    body: JSON.stringify(textOnlyPayload)
+                  });
+                  metaDmData = await metaDmRes.json();
+                }
+
+                if (metaDmRes.ok) {
+                  status = 'SENT';
+                } else {
+                  status = 'FAILED_API_ERROR';
+                  apiErrorMsg = metaDmData.error?.message || JSON.stringify(metaDmData);
+                }
+                console.log('[META IG PRIVATE REPLY DM RESPONSE]', { status, metaDmData });
+              } catch (dmErr: any) {
+                status = 'FAILED_API_ERROR';
+                apiErrorMsg = dmErr.message;
                 console.error('[META IG PRIVATE REPLY DM FAILED]', dmErr);
               }
             } else {
-              console.warn('[META WEBHOOK WARNING] Live Access token missing or unconfigured. DM stored in Inbox.');
+              console.warn('[META WEBHOOK WARNING] Live Access token missing or unconfigured. DM recorded in system.');
             }
+
+            // Record to real-time Webhook Activity Log
+            recordWebhookLog({
+              organizationId: orgId,
+              eventType: 'Instagram Post Comment',
+              username,
+              commentText,
+              matchedKeyword: result.matchedTrigger?.keywords[0] || 'COMMENT',
+              dmStatus: status,
+              error: apiErrorMsg
+            });
           }
         }
       }
+
 
       // 2. Handle Direct Messaging & Quick Reply Taps (Step 2 Document Delivery)
       if (entry.messaging && entry.messaging.length > 0) {
@@ -121,18 +166,26 @@ export async function POST(req: NextRequest) {
             const username = `user_${senderId.slice(-4)}`;
 
             // If user clicked quick reply button "UNLOCK_FILE" or sent "unlock", run Step 2 File Delivery
-            if (quickReplyPayload === 'UNLOCK_FILE' || text.toUpperCase().includes('UNLOCK') || text.toUpperCase().includes('FOLLOW')) {
+            if (
+              quickReplyPayload === 'UNLOCK_FILE' ||
+              text.toUpperCase().includes('UNLOCK') ||
+              text.toUpperCase().includes('FOLLOW') ||
+              text.toUpperCase().includes('CATALOG') ||
+              text.toUpperCase().includes('PDF')
+            ) {
               const unlockResult = processFollowUnlockEvent({
                 organizationId: orgId,
                 username: username
               });
 
-              const waAcc = getWhatsAppAccount(orgId);
-              const accessToken = waAcc?.accessToken || process.env.META_ACCESS_TOKEN;
+              const accessToken = getLiveMetaAccessToken(orgId);
 
-              if (accessToken && !accessToken.startsWith('EAAG9x8b7c6d')) {
+              let status: 'SENT' | 'FAILED_NO_TOKEN' | 'FAILED_API_ERROR' = 'FAILED_NO_TOKEN';
+              let apiErrorMsg: string | undefined = undefined;
+
+              if (accessToken) {
                 try {
-                  await fetch(`https://graph.facebook.com/v21.0/${igAccId}/messages`, {
+                  const metaDmRes = await fetch(`https://graph.facebook.com/v21.0/${igAccId}/messages`, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
@@ -143,10 +196,28 @@ export async function POST(req: NextRequest) {
                       message: { text: unlockResult.fullContent }
                     })
                   });
-                } catch (dmErr) {
-                  console.error('[META STEP 2 DOCUMENT DELIVERY FAILED]', dmErr);
+                  const metaDmData = await metaDmRes.json();
+                  if (metaDmRes.ok) {
+                    status = 'SENT';
+                  } else {
+                    status = 'FAILED_API_ERROR';
+                    apiErrorMsg = metaDmData.error?.message;
+                  }
+                } catch (dmErr: any) {
+                  status = 'FAILED_API_ERROR';
+                  apiErrorMsg = dmErr.message;
                 }
               }
+
+              recordWebhookLog({
+                organizationId: orgId,
+                eventType: 'Instagram DM Unlock Delivery',
+                username,
+                commentText: text || 'UNLOCK_FILE',
+                matchedKeyword: 'UNLOCK',
+                dmStatus: status,
+                error: apiErrorMsg
+              });
             } else {
               // Standard DM message
               processSocialCommentEvent({
@@ -155,6 +226,15 @@ export async function POST(req: NextRequest) {
                 username: username,
                 postId: 'direct_dm',
                 commentText: text
+              });
+
+              recordWebhookLog({
+                organizationId: orgId,
+                eventType: 'Instagram Inbound Direct Message',
+                username,
+                commentText: text,
+                matchedKeyword: 'DIRECT_DM',
+                dmStatus: 'RECEIVED'
               });
             }
           }
